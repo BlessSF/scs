@@ -1,0 +1,67 @@
+<?php
+require __DIR__ . '/../config/config.php';
+require __DIR__ . '/../config/auth.php';
+require __DIR__ . '/../includes/functions.php';
+require_admin();
+
+$id = (int)($_GET['id'] ?? 0);
+$shift = $_GET['shift'] ?? '';
+$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
+$summary = period_summary($pdo, $id, $shift);
+if (!$summary) {
+    flash('error', 'Period not found.');
+    redirect('/periods/list.php');
+}
+$period = $summary['period'];
+require_branch_access($period['branch_id']);
+$branch = get_branch($period['branch_id']);
+$rows = $summary['rows'];
+$themeKey = branch_theme_key($branch['name'] ?? '');
+$colors = branch_theme_colors($themeKey);
+$companyName = get_setting('company_name', '');
+$approvedBy = get_setting('approved_by_name', '');
+
+$pageTitle = 'All Slips — ' . $period['name'];
+require __DIR__ . '/../includes/header.php';
+?>
+<div class="actions no-print">
+    <button class="btn" onclick="window.print()">🖨 Print All Slips</button>
+    <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $shift ? '&shift='.urlencode($shift) : '' ?>">Back to Period</a>
+</div>
+
+<h1 class="no-print"><?= h($branch['name'] ?? '') ?> — <?= h($period['name']) ?></h1>
+<p class="subtitle no-print">
+    <?= count($rows) ?> slip<?= count($rows) === 1 ? '' : 's' ?> ready to print.
+    <?php if ($shift): ?> Filtered: <?= h($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only') ?><?php endif; ?>
+</p>
+
+<?php if (!$rows): ?>
+    <div class="card"><p class="muted">No staff have earnings recorded for this period yet.</p></div>
+<?php endif; ?>
+
+<div class="slip-batch-grid">
+<?php foreach ($rows as $row): ?>
+    <div class="slip" style="border-top: 4px solid <?= $colors['solid'] ?>;">
+        <h2><?= h($companyName) ?> Service Charge Slip</h2>
+
+        <div class="slip-row"><span>Name</span><strong><?= h($row['full_name']) ?></strong></div>
+        <div class="slip-row"><span>Covered Period</span><span><?= h(date('M j', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?></span></div>
+        <div class="slip-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
+        <div class="slip-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= $row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>
+        <div class="slip-row"><span>Bar Night SC (<?= (int)$row['bar_night_days'] ?> day<?= $row['bar_night_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['bar_night_sc']) ?></span></div>
+        <div class="slip-row total"><span>GROSS SERVICE CHARGE</span><span><?= money($row['combined_total_sc']) ?></span></div>
+
+        <div class="slip-sig">
+            <div>
+                <span class="slip-sig-name"><?= h($row['full_name']) ?></span>
+                Received By
+            </div>
+            <div>
+                <span class="slip-sig-name"><?= h($approvedBy) ?></span>
+                Approved By
+            </div>
+        </div>
+    </div>
+<?php endforeach; ?>
+</div>
+<?php require __DIR__ . '/../includes/footer.php'; ?>
