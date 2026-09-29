@@ -92,7 +92,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="actions" style="justify-content:space-between; flex-wrap:wrap;">
     <a class="btn" href="<?= BASE_URL ?>/staff/form.php?branch_id=<?= $sharedId ?>">+ Add Staff to Shared</a>
     <form method="get" class="filter-bar">
-        <input type="search" id="q" name="q" value="<?= h($search) ?>" placeholder="Search by name…" style="width:auto; min-width:180px;">
+        <input type="search" id="q" name="q" value="<?= h($search) ?>" placeholder="Search staff by name…" style="width:auto; min-width:180px;">
         <select id="status" name="status" onchange="this.form.submit()" style="width:auto;">
             <option value="">All Statuses</option>
             <option value="regular" <?= $status === 'regular' ? 'selected' : '' ?>>Regular</option>

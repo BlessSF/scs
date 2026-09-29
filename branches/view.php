@@ -75,6 +75,7 @@ require __DIR__ . '/../includes/header.php';
         <div class="stat-value"><?= $activeStaffCount ?></div>
         <div class="stat-label">Active Staff</div>
     </div>
+    <?php if (!$isCashier): ?>
     <div class="stat-card">
         <div class="stat-icon">🗓️</div>
         <div class="stat-value"><?= money($todayTotal) ?></div>
@@ -83,6 +84,7 @@ require __DIR__ . '/../includes/header.php';
             <div class="small muted" style="margin-top:4px;">🌙 Bar Night: <?= money($todayBarNight) ?></div>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
     <?php if (!$isCashier): ?>
     <div class="stat-card">
         <div class="stat-icon">💰</div>

@@ -38,6 +38,11 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
     $stmt->execute($accessibleIds ? array_merge([$thisMonthStart, $thisMonthEnd], $accessibleIds) : [$thisMonthStart, $thisMonthEnd]);
     $monthTotal = (float)$stmt->fetchColumn();
 
+    $allTimeSql = "SELECT COALESCE(SUM(total_amount),0) FROM duty_days" . ($accessibleIds ? " WHERE branch_id IN ($inPlaceholders)" : "");
+    $stmt = $pdo->prepare($allTimeSql);
+    $stmt->execute($accessibleIds ?: []);
+    $allTimeTotal = (float)$stmt->fetchColumn();
+
     $today = date('Y-m-d');
     $todaySql = "SELECT COALESCE(SUM(total_amount),0) FROM duty_days WHERE duty_date = ?" . ($accessibleIds ? " AND branch_id IN ($inPlaceholders)" : "");
     $stmt = $pdo->prepare($todaySql);
@@ -88,11 +93,13 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
             <div class="stat-value" id="statStaffCount"><?= $staffCount ?></div>
             <div class="stat-label">Active Staff</div>
         </div>
+        <?php if (!$isCashier): ?>
         <div class="stat-card">
             <div class="stat-icon">🗓️</div>
-            <div class="stat-value" id="statTodayTotal"><?= money($todayTotal) ?></div>
-            <div class="stat-label">Gross SC — Today</div>
+            <div class="stat-value" id="statAllTimeTotal"><?= money($allTimeTotal) ?></div>
+            <div class="stat-label">Gross SC — All Time</div>
         </div>
+        <?php endif; ?>
         <?php if (!$isCashier): ?>
         <div class="stat-card">
             <div class="stat-icon">💰</div>
@@ -145,7 +152,9 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
         </div>
         <div class="sp-stats">
             <div class="sp-stat"><b><?= (int)$branchStats[0]['staff_count'] ?></b><span>Active Staff</span></div>
+            <?php if (!$isCashier): ?>
             <div class="sp-stat"><b><?= h(money($branchStats[0]['today_total'])) ?></b><span>Gross SC (Today)</span></div>
+            <?php endif; ?>
         </div>
         <a class="btn" href="<?= BASE_URL ?>/branches/view.php?id=<?= (int)$branchStats[0]['id'] ?>">View Branch Page →</a>
         <a class="btn" href="<?= BASE_URL ?>/duty/calendar.php">Open Duty Entry →</a>
@@ -271,8 +280,8 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
             document.getElementById('statStaffCount').textContent = data.staff_count;
             var monthEl = document.getElementById('statMonthTotal');
             if (monthEl) monthEl.textContent = data.month_total;
-            var todayEl = document.getElementById('statTodayTotal');
-            if (todayEl && data.today_total !== undefined) todayEl.textContent = data.today_total;
+            var allEl = document.getElementById('statAllTimeTotal');
+            if (allEl && data.all_time_total !== undefined) allEl.textContent = data.all_time_total;
             var openEl = document.getElementById('statOpenPeriods');
             if (openEl) openEl.textContent = data.open_periods;
             document.getElementById('branchCountText').textContent =

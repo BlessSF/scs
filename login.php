@@ -41,22 +41,65 @@ $pageTitle = 'Login';
 require __DIR__ . '/includes/header.php';
 ?>
 <div class="login-wrap">
-    <h1><?= h(get_setting('company_name', 'Service Charge')) ?></h1>
-    <p class="subtitle">Service Charge Management System</p>
+    <aside class="login-hero">
+        <span class="lh-orb lh-orb-1"></span>
+        <span class="lh-orb lh-orb-2"></span>
+        <span class="lh-orb lh-orb-3"></span>
 
-    <?php if ($error): ?>
-        <div class="alert alert-error"><?= h($error) ?></div>
-    <?php endif; ?>
+        <div class="lh-badge">✨ Welcome back</div>
+        <h2><?= h(get_setting('company_name', 'Service Charge')) ?></h2>
+        <p class="lh-tag">Fair, transparent service charge &mdash; for every branch and every team member.</p>
 
-    <form method="post" action="">
-        <?= csrf_field() ?>
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" autofocus required>
+        <ul class="lh-features">
+            <li><span class="lh-ico">🗓️</span><div><b>Daily duty entry</b><small>Log totals and attendance in seconds</small></div></li>
+            <li><span class="lh-ico">📊</span><div><b>Live branch stats</b><small>See every branch update in real time</small></div></li>
+            <li><span class="lh-ico">🧾</span><div><b>Instant payslips</b><small>Clear payouts, ready to print</small></div></li>
+        </ul>
 
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
+        <div class="lh-dots" aria-hidden="true">
+            <span style="background:#ff8a1e"></span><span style="background:#1fa24d"></span>
+            <span style="background:#d62b2b"></span><span style="background:#f4b74a"></span>
+        </div>
+    </aside>
 
-        <button type="submit" class="btn" style="width:100%;margin-top:20px;">Sign In</button>
-    </form>
+    <section class="login-form-side">
+        <h1>Sign in</h1>
+        <p class="subtitle">Service Charge Management System</p>
+
+        <?php if ($error): ?>
+            <div class="alert alert-error"><?= h($error) ?></div>
+        <?php endif; ?>
+
+        <form method="post" action="">
+            <?= csrf_field() ?>
+            <label for="username">Username</label>
+            <div class="lf-field">
+                <span class="lf-icon">👤</span>
+                <input type="text" id="username" name="username" placeholder="Enter your username" autocomplete="username" autofocus required>
+            </div>
+
+            <label for="password">Password</label>
+            <div class="lf-field">
+                <span class="lf-icon">🔒</span>
+                <input type="password" id="password" name="password" placeholder="Enter your password" autocomplete="current-password" required>
+                <button type="button" class="lf-eye" id="togglePw" aria-label="Show password">Show</button>
+            </div>
+
+            <button type="submit" class="btn lf-submit">Sign In &rarr;</button>
+        </form>
+        <p class="lf-foot">Trouble signing in? Ask your administrator.</p>
+    </section>
 </div>
+<script>
+(function () {
+    var b = document.getElementById('togglePw'), i = document.getElementById('password');
+    if (!b || !i) return;
+    b.addEventListener('click', function () {
+        var show = i.type === 'password';
+        i.type = show ? 'text' : 'password';
+        b.textContent = show ? 'Hide' : 'Show';
+        b.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+    });
+})();
+</script>
 <?php require __DIR__ . '/includes/footer.php'; ?>

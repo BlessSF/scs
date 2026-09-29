@@ -100,7 +100,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="actions" style="justify-content:space-between; flex-wrap:wrap;">
     <a class="btn" href="<?= BASE_URL ?>/staff/form.php<?= $branchId ? '?branch_id=' . $branchId : '' ?>">+ Add Staff<?= ($branchId && $branchId === (function_exists('shared_branch_id') ? shared_branch_id() : 0)) ? ' to Shared' : '' ?></a>
     <form method="get" class="filter-bar">
-        <input type="search" id="q" name="q" value="<?= h($search) ?>" placeholder="Search by name…" style="width:auto; min-width:180px;">
+        <input type="search" id="q" name="q" value="<?= h($search) ?>" placeholder="Search staff by name…" style="width:auto; min-width:180px;">
         <?php if (!is_branch_locked()): ?>
         <select id="branch_id" name="branch_id" onchange="this.form.submit()" style="width:auto;">
             <option value="0">All Branches</option>

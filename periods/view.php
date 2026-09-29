@@ -83,42 +83,58 @@ require __DIR__ . '/../includes/header.php';
 
 <div class="card">
     <h2>Staff Breakdown</h2>
-    <div style="overflow-x:auto;">
-    <table style="width:100%; table-layout:auto; font-size:0.82rem;">
+    <div>
+    <table style="width:100%; table-layout:fixed; font-size:0.75rem; border-collapse:collapse;">
+        <colgroup>
+            <col style="width:13%"><!-- Name -->
+            <col style="width:8%"> <!-- Status -->
+            <col style="width:5%"> <!-- Reg Days -->
+            <col style="width:8%"> <!-- Reg SC -->
+            <col style="width:5%"> <!-- Bar Days -->
+            <col style="width:8%"> <!-- Bar SC -->
+            <col style="width:8%"> <!-- Total SC -->
+            <col style="width:7%"> <!-- Mgmt% -->
+            <col style="width:8%"> <!-- Gross -->
+            <col style="width:6%"> <!-- Dmg -->
+            <col style="width:7%"> <!-- Cash Adv -->
+            <col style="width:7%"> <!-- Overcost -->
+            <col style="width:8%"> <!-- Net -->
+            <col style="width:6%"> <!-- Actions -->
+        </colgroup>
         <thead>
             <tr>
-                <th style="min-width:110px;">Name</th>
-                <th style="min-width:80px;">Status</th>
-                <th class="text-right" style="white-space:nowrap;">Reg. Days</th>
-                <th class="text-right" style="white-space:nowrap;">Reg. SC</th>
-                <th class="text-right" style="white-space:nowrap;">Bar Days</th>
-                <th class="text-right" style="white-space:nowrap;">Bar SC</th>
-                <th class="text-right" style="white-space:nowrap;">Total SC</th>
-                <th class="text-right" style="white-space:nowrap;">Mgmt%</th>
-                <th class="text-right" style="white-space:nowrap;">Gross</th>
-                <th class="text-right" style="white-space:nowrap;">Dmg.</th>
-                <th class="text-right" style="white-space:nowrap;">Cash Adv.</th>
-                <th class="text-right" style="white-space:nowrap;">Overcost</th>
-                <th class="text-right" style="white-space:nowrap;">Net</th>
-                <th style="min-width:76px;"></th>
+                <th>Name</th>
+                <th>Status</th>
+                <th class="text-right">Days</th>
+                <th class="text-right">Reg. SC</th>
+                <th class="text-right">Bar</th>
+                <th class="text-right">Bar SC</th>
+                <th class="text-right">Total SC</th>
+                <th class="text-right">Mgmt</th>
+                <th class="text-right">Gross</th>
+                <th class="text-right">Dmg</th>
+                <th class="text-right">Cash</th>
+                <th class="text-right">Overcost</th>
+                <th class="text-right">Net</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
         <?php foreach ($rows as $r): ?>
             <tr>
-                <td><?= h($r['full_name']) ?><?php if (!empty($r['is_hidden'])): ?> <span class="badge badge-regular" title="Owner / Admin, from the Shared branch">Shared</span><?php endif; ?></td>
+                <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<?= h($r['full_name']) ?>"><?= h($r['full_name']) ?><?php if (!empty($r['is_hidden'])): ?> <span class="badge badge-regular" title="Owner / Admin, from the Shared branch">Shared</span><?php endif; ?></td>
                 <td><span class="badge badge-<?= h($r['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$r['status']))) ?></span></td>
-                <td class="text-right"><?= (int)$r['regular_days'] ?></td>
-                <td class="text-right"><?= money($r['regular_sc']) ?></td>
-                <td class="text-right"><?= (int)$r['bar_night_days'] ?></td>
-                <td class="text-right"><?= money($r['bar_night_sc']) ?></td>
-                <td class="text-right"><?= money($r['total_sc']) ?></td>
-                <td class="text-right"><?= money($r['management_share']) ?></td>
-                <td class="text-right"><?= money($r['gross']) ?></td>
-                <td class="text-right"><?= money($r['damages_charges']) ?></td>
-                <td class="text-right"><?= money($r['cash_advance']) ?></td>
-                <td class="text-right"><?= money($r['overcost_cogs']) ?></td>
-                <td class="text-right"><strong><?= money($r['net']) ?></strong></td>
+                <td class="text-right" style="white-space:nowrap;"><?= (int)$r['regular_days'] ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['regular_sc']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= (int)$r['bar_night_days'] ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['bar_night_sc']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['total_sc']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['management_share']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['gross']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['damages_charges']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['cash_advance']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= money($r['overcost_cogs']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><strong><?= money($r['net']) ?></strong></td>
                 <td>
                     <div style="display:flex; gap:6px; align-items:center;">
                     <?php if (is_admin()): ?>

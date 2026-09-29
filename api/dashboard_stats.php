@@ -38,6 +38,11 @@ $stmt = $pdo->prepare($monthSql);
 $stmt->execute($accessibleIds ? array_merge([$thisMonthStart, $thisMonthEnd], $accessibleIds) : [$thisMonthStart, $thisMonthEnd]);
 $monthTotal = (float)$stmt->fetchColumn();
 
+$allTimeSql = "SELECT COALESCE(SUM(total_amount),0) FROM duty_days" . ($accessibleIds ? " WHERE branch_id IN ($inPlaceholders)" : "");
+$stmt = $pdo->prepare($allTimeSql);
+$stmt->execute($accessibleIds ?: []);
+$allTimeTotal = (float)$stmt->fetchColumn();
+
 $today = date('Y-m-d');
 $todaySql = "SELECT COALESCE(SUM(total_amount),0) FROM duty_days WHERE duty_date = ?" . ($accessibleIds ? " AND branch_id IN ($inPlaceholders)" : "");
 $stmt = $pdo->prepare($todaySql);
@@ -59,6 +64,7 @@ echo json_encode([
     'open_periods'  => $openPeriods,
     'month_total'   => money($monthTotal),
     'today_total'   => money($todayTotal),
+    'all_time_total' => money($allTimeTotal),
     'branches'      => array_map(function ($b) {
         return [
             'id'              => (int)$b['id'],
