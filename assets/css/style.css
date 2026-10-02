@@ -683,9 +683,12 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; cursor: poi
     display: flex;
     flex-direction: column;
     gap: 8px;
-    max-height: 480px;
-    overflow-y: auto;
     padding: 2px;
+    /* Intentionally NOT height-limited / scrollable on its own: a scrollbox
+       nested inside the page, combined with non-100% browser zoom, is a
+       known Chromium rendering bug that can leave a large blank gap below
+       it. The list now flows with the page, which uses the browser's own
+       single scrollbar instead. */
 }
 .staff-row {
     display: flex;
@@ -749,7 +752,6 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; cursor: poi
 
 @media (max-width: 768px) {
     .staff-row { padding: 14px 14px; }
-    .staff-select-list { max-height: 60vh; }
     .staff-select-toolbar { flex-wrap: wrap; }
 }
 .day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 7px; }
@@ -1071,4 +1073,27 @@ td .btn-sm + .btn-sm, td form + .btn-sm, td .btn-sm + form { margin-left: 4px; }
 @media (min-width: 1400px) {
     .container { max-width: 1360px; }
     .topbar-inner { max-width: 1360px; }
+}
+
+/* =====================================================================
+   Sticky Save bar for Duty Entry (duty/day.php)
+   Keeps Save Day / Back to Calendar reachable at all times, even with a
+   long staff list, without relying on a nested scrollbox.
+   ===================================================================== */
+.sticky-save-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 30;
+    margin: 20px -22px 0;
+    padding: 14px 22px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border-top: 1px solid var(--border-strong);
+    box-shadow: 0 -6px 18px rgba(6,30,24,.08);
+}
+.sticky-save-bar .actions { margin: 0; }
+@media (max-width: 900px) {
+    .sticky-save-bar { margin: 20px -16px 0; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 }

@@ -188,9 +188,11 @@ require __DIR__ . '/../includes/header.php';
         <?php endforeach; ?>
     </div>
 
-    <div class="actions" style="margin-top:20px;">
-        <button type="submit" class="btn">Save Day</button>
-        <a class="btn btn-secondary" href="<?= BASE_URL ?>/duty/calendar.php?branch_id=<?= $branchId ?>&month=<?= date('n', strtotime($date)) ?>&year=<?= date('Y', strtotime($date)) ?>">Back to Calendar</a>
+    <div class="sticky-save-bar">
+        <div class="actions">
+            <button type="submit" class="btn">Save Day</button>
+            <a class="btn btn-secondary" href="<?= BASE_URL ?>/duty/calendar.php?branch_id=<?= $branchId ?>&month=<?= date('n', strtotime($date)) ?>&year=<?= date('Y', strtotime($date)) ?>">Back to Calendar</a>
+        </div>
     </div>
 </form>
 
