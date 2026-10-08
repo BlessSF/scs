@@ -39,6 +39,38 @@ foreach ($dutyDaysByShift as $shift => $dd) {
     $presentIdsByShift[$shift] = array_column($s2->fetchAll(), 'staff_id');
 }
 
+// Includes staff whose home branch is this one, plus anyone additionally
+// assigned here via staff_branches (e.g. a Hero staff member covering H-Bar).
+$allStaff = staff_for_branch($branchId, true);
+$allStaffIds = array_map('intval', array_column($allStaff, 'id'));
+
+// Staff from OTHER branches who can be ticked as "visiting" (e.g. a Stella
+// staff member sent to Hero for the day). Anyone already saved on this day
+// stays in the list even if they've since been deactivated, so re-saving the
+// day never silently drops them.
+$visitingList = staff_visiting_candidates($branchId);
+$visitingIds  = array_map('intval', array_column($visitingList, 'id'));
+$attachedIds  = [];
+foreach ($presentIdsByShift as $ids) { foreach ($ids as $i) { $attachedIds[(int)$i] = true; } }
+$missingAttached = array_values(array_diff(array_keys($attachedIds), $allStaffIds, $visitingIds));
+if ($missingAttached) {
+    $ph = implode(',', array_fill(0, count($missingAttached), '?'));
+    $mx = $pdo->prepare("SELECT s.*, b.name AS home_branch_name FROM staff s JOIN branches b ON b.id = s.branch_id
+                         WHERE s.id IN ($ph) AND s.is_hidden = 0 ORDER BY b.name, s.full_name");
+    $mx->execute($missingAttached);
+    $visitingList = array_merge($visitingList, $mx->fetchAll());
+    usort($visitingList, function ($a, $b) {
+        return [$a['home_branch_name'], $a['full_name']] <=> [$b['home_branch_name'], $b['full_name']];
+    });
+    $visitingIds = array_map('intval', array_column($visitingList, 'id'));
+}
+$validStaffIds = array_merge($allStaffIds, $visitingIds);
+
+// Which of THIS branch's staff are already on duty at another branch the same
+// day (per shift) -- shown as an "At Hero today" tag and pre-ticked on a new entry.
+$elsewhereByShift = [];
+foreach ($shifts as $sh) { $elsewhereByShift[$sh] = staff_on_duty_elsewhere($branchId, $date, $sh); }
+
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -63,6 +95,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $amount = $totalsByShift[$shift];
                 $notes = trim($postedNotes[$shift] ?? '');
                 $presentPost = array_values(array_unique(array_map('intval', $postedPresent[$shift] ?? [])));
+                // Only staff actually offered on this page (this branch's roster or the visiting list).
+                $presentPost = array_values(array_intersect($presentPost, $validStaffIds));
 
                 $existing = $dutyDaysByShift[$shift] ?? null;
 
@@ -90,7 +124,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 // Auto-add hidden staff (owners/admin) to every duty day
                 // Only owners assigned to THIS branch (home branch or "Also assign to these branches").
-                $hsStmt = $pdo->prepare('SELECT s.id, s.excluded_days FROM staff s
+                $hsStmt = $pdo->prepare('SELECT s.id, s.excluded_days, s.counted_months FROM staff s
                     WHERE s.is_hidden = 1 AND s.is_active = 1
                       AND (s.branch_id = ? OR EXISTS (SELECT 1 FROM staff_branches sb WHERE sb.staff_id = s.id AND sb.branch_id = ?))');
                 $hsStmt->execute([$branchId, $branchId]);
@@ -100,6 +134,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Honor the owner's excluded weekdays (same rule as the backfill).
                     $excl = array_filter(array_map('trim', explode(',', $hs['excluded_days'] ?? '')), 'strlen');
                     if (in_array((string)$dutyDow, $excl, true)) continue;
+                    // Honor the owner's month limit (e.g. only Aug & Sep 2026).
+                    $cm = array_filter(array_map('trim', explode(',', $hs['counted_months'] ?? '')), 'strlen');
+                    if ($cm && !in_array(date('Y-m', strtotime($date)), $cm, true)) continue;
                     if (!in_array($hs['id'], $presentPost)) {
                         try { $ins->execute([$dutyDayId, $hs['id']]); } catch (PDOException $e) { /* already added */ }
                     }
@@ -120,15 +157,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Includes staff whose home branch is this one, plus anyone additionally
-// assigned here via staff_branches (e.g. a Hero staff member covering H-Bar).
-$allStaff = staff_for_branch($branchId, true);
-
 $pageTitle = 'Duty Entry — ' . date('M j, Y', strtotime($date));
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1><?= date('l, F j, Y', strtotime($date)) ?></h1>
-<p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked<?= $isBarNightDay ? ' &mdash; separately for Regular hours and Bar Night.' : '.' ?></p>
+<p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked (including staff visiting from other branches)<?= $isBarNightDay ? ' &mdash; separately for Regular hours and Bar Night.' : '.' ?></p>
 
 <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
 
@@ -172,11 +205,19 @@ require __DIR__ . '/../includes/header.php';
             <?php endif; ?>
 
             <div class="staff-select-list" id="<?= $listId ?>" data-counter="<?= $counterId ?>">
-                <?php foreach ($allStaff as $s): $checked = in_array($s['id'], $presentIds); ?>
+                <?php foreach ($allStaff as $s):
+                    $elsewhere = $elsewhereByShift[$shift][(int)$s['id']] ?? null;
+                    // New regular-day entry: a staff member who is on duty at another branch
+                    // today is still credited here, so pre-tick them (untick if not wanted).
+                    $autoTick = ($elsewhere !== null && !$dutyDay && $shift === 'regular');
+                    $checked = in_array($s['id'], $presentIds) || $autoTick; ?>
                     <label class="staff-row<?= $checked ? ' is-checked' : '' ?>">
                         <input type="checkbox" name="present[<?= $shift ?>][]" value="<?= $s['id'] ?>" <?= $checked ? 'checked' : '' ?>>
                         <span class="sr-check" aria-hidden="true"></span>
                         <span class="sr-name"><?= h($s['full_name']) ?></span>
+                        <?php if ($elsewhere !== null): ?>
+                            <span class="badge badge-elsewhere" title="Also on duty at another branch today. Still credited here when ticked.">At <?= h($elsewhere) ?> today</span>
+                        <?php endif; ?>
                         <span class="badge badge-<?= h($s['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$s['status']))) ?></span>
                     </label>
                 <?php endforeach; ?>
@@ -184,6 +225,31 @@ require __DIR__ . '/../includes/header.php';
                     <p class="muted">No active staff in this branch. <a href="<?= BASE_URL ?>/staff/form.php?branch_id=<?= $branchId ?>">Add staff first</a>.</p>
                 <?php endif; ?>
             </div>
+
+            <?php if ($visitingList):
+                $visListId    = 'visList_' . $shift;
+                $visCounterId = 'visCount_' . $shift;
+                $visChecked   = count(array_intersect($presentIds, $visitingIds));
+                $lastGroup    = null;
+            ?>
+            <details class="visiting-box"<?= $visChecked ? ' open' : '' ?>>
+                <summary>&#10133; Staff visiting from other branches <span class="hint">(<span id="<?= $visCounterId ?>"><?= $visChecked ?></span> selected)</span></summary>
+                <p class="muted" style="margin:6px 0 12px;">Tick anyone from another branch who worked here. They share in this branch&rsquo;s service charge for the day and appear in this branch&rsquo;s period as &ldquo;Visiting&rdquo;. To also credit them at their own branch, tick them on that branch&rsquo;s entry for the same day.</p>
+                <div class="staff-select-list" id="<?= $visListId ?>" data-counter="<?= $visCounterId ?>">
+                    <?php foreach ($visitingList as $v): $vChecked = in_array((int)$v['id'], array_map('intval', $presentIds), true);
+                        if ($lastGroup !== $v['home_branch_name']): $lastGroup = $v['home_branch_name']; ?>
+                        <div class="vis-group"><?= h($lastGroup) ?></div>
+                    <?php endif; ?>
+                    <label class="staff-row<?= $vChecked ? ' is-checked' : '' ?>">
+                        <input type="checkbox" name="present[<?= $shift ?>][]" value="<?= $v['id'] ?>" <?= $vChecked ? 'checked' : '' ?>>
+                        <span class="sr-check" aria-hidden="true"></span>
+                        <span class="sr-name"><?= h($v['full_name']) ?></span>
+                        <span class="badge badge-visiting"><?= h($v['home_branch_name']) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </details>
+            <?php endif; ?>
         </div>
         <?php endforeach; ?>
     </div>

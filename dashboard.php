@@ -9,8 +9,9 @@ $pageTitle = 'Dashboard';
 
 require __DIR__ . '/includes/header.php';
 
-if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
+if (in_array($user['role'], ['admin', 'cashier', 'owner'], true)) {
     $isCashier = $user['role'] === 'cashier';
+    $isOwner   = $user['role'] === 'owner'; // read-only company view: no branch drill-downs, no admin shortcuts
     $lockedBranchId = current_branch_id(); // null = sees every branch
     $accessibleIds  = accessible_branch_ids(); // null = every branch; else own branch + its sub-branches
     $inPlaceholders = $accessibleIds ? implode(',', array_fill(0, count($accessibleIds), '?')) : '';
@@ -68,7 +69,7 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
     ?>
 
     <div class="hero-banner">
-        <h1><?= h($greeting) ?>, <?= h($user['full_name']) ?> 👋</h1>
+        <h1><?= h($greeting) ?>, <?= h($user['full_name']) ?></h1>
         <p class="subtitle">
             <?php if (count($branchStats) === 1): ?>
                 Here's what's happening at <strong><?= h($branchStats[0]['name']) ?></strong> today.
@@ -119,7 +120,7 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
     <?php if (count($branchStats) > 1): ?>
     <div class="section-heading">
         <h2>By Branch — Today</h2>
-        <span class="hint">Tap a branch to open its page</span>
+        <?php if (!$isOwner): ?><span class="hint">Tap a branch to open its page</span><?php endif; ?>
     </div>
 
     <div class="branch-grid" id="branchGrid">
@@ -127,18 +128,18 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
             $key = branch_theme_key($b['name']);
             $pct = round(((float)$b['today_total'] / $maxBranchToday) * 100);
         ?>
-            <a href="<?= BASE_URL ?>/branches/view.php?id=<?= (int)$b['id'] ?>"
+            <<?= $isOwner ? 'div' : 'a href="' . BASE_URL . '/branches/view.php?id=' . (int)$b['id'] . '"' ?>
                     class="branch-card branch-<?= h($key) ?>"
                     data-branch-id="<?= (int)$b['id'] ?>">
                 <div class="bc-top">
                     <span class="bc-dot"></span>
                     <span class="bc-name"><?= h($b['name']) ?></span>
-                    <span class="bc-check">→</span>
+                    <?php if (!$isOwner): ?><span class="bc-check">→</span><?php endif; ?>
                 </div>
                 <div class="bc-row"><span class="k">Active staff</span><span class="v"><?= (int)$b['staff_count'] ?></span></div>
                 <div class="bc-row"><span class="k">Gross SC (Today)</span><span class="v"><?= h(money($b['today_total'])) ?></span></div>
                 <div class="bc-bar-track"><div class="bc-bar-fill" style="width: <?= $pct ?>%;"></div></div>
-            </a>
+            </<?= $isOwner ? 'div' : 'a' ?>>
         <?php endforeach; ?>
         <?php if (!$branchStats): ?>
             <p class="muted">No branches yet<?= $isCashier ? '.' : '. <a href="' . BASE_URL . '/branches/form.php">Add one</a>.' ?></p>
@@ -156,8 +157,10 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
             <div class="sp-stat"><b><?= h(money($branchStats[0]['today_total'])) ?></b><span>Gross SC (Today)</span></div>
             <?php endif; ?>
         </div>
+        <?php if (!$isOwner): ?>
         <a class="btn" href="<?= BASE_URL ?>/branches/view.php?id=<?= (int)$branchStats[0]['id'] ?>">View Branch Page →</a>
         <a class="btn" href="<?= BASE_URL ?>/duty/calendar.php">Open Duty Entry →</a>
+        <?php endif; ?>
     </div>
     <?php endif; ?>
 
@@ -222,6 +225,15 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
     <div class="section-heading">
         <h2>Quick Actions</h2>
     </div>
+    <?php if ($isOwner): ?>
+    <div class="quick-grid">
+        <a class="quick-tile" href="<?= BASE_URL ?>/owners/earnings.php">
+            <span class="qt-icon">💼</span>
+            <span class="qt-title">Owner Earnings</span>
+            <span class="qt-desc">Your share across every branch and period</span>
+        </a>
+    </div>
+    <?php else: ?>
     <div class="quick-grid">
         <a class="quick-tile" href="<?= BASE_URL ?>/duty/calendar.php">
             <span class="qt-icon">📝</span>
@@ -248,12 +260,14 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
         </a>
         <?php endif; ?>
     </div>
+    <?php endif; ?>
 
     <?php if (count($branchStats) > 1): ?>
     <script>
     (function () {
         var url = <?= json_encode(BASE_URL) ?> + '/api/dashboard_stats.php';
         var viewBase = <?= json_encode(BASE_URL . '/branches/view.php') ?>;
+        var isOwner = <?= json_encode($isOwner) ?>;
         var pollMs = 8000;
         var timer = null;
 
@@ -307,12 +321,14 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
                 var key = themeKey(b.name);
                 var rawTotal = parseFloat((b.today_total_raw !== undefined ? b.today_total_raw : b.today_total).toString().replace(/[^0-9.]/g, '')) || 0;
                 var pct = Math.round((rawTotal / maxTodayRaw) * 100);
-                return '<a href="' + viewBase + '?id=' + b.id + '" class="branch-card branch-' + key + '" data-branch-id="' + b.id + '">' +
-                    '<div class="bc-top"><span class="bc-dot"></span><span class="bc-name">' + escapeHtml(b.name) + '</span><span class="bc-check">→</span></div>' +
+                var tag = isOwner ? 'div' : 'a';
+                var open = isOwner ? '<div' : '<a href="' + viewBase + '?id=' + b.id + '"';
+                return open + ' class="branch-card branch-' + key + '" data-branch-id="' + b.id + '">' +
+                    '<div class="bc-top"><span class="bc-dot"></span><span class="bc-name">' + escapeHtml(b.name) + '</span>' + (isOwner ? '' : '<span class="bc-check">→</span>') + '</div>' +
                     '<div class="bc-row"><span class="k">Active staff</span><span class="v">' + b.staff_count + '</span></div>' +
                     '<div class="bc-row"><span class="k">Gross SC (Today)</span><span class="v">' + escapeHtml(b.today_total) + '</span></div>' +
                     '<div class="bc-bar-track"><div class="bc-bar-fill" style="width:' + pct + '%;"></div></div>' +
-                    '</a>';
+                    '</' + tag + '>';
             }).join('');
             grid.innerHTML = cards;
         }
@@ -360,7 +376,7 @@ if ($user['role'] === 'admin' || $user['role'] === 'cashier') {
     $key = branch_theme_key($staff['branch_name'] ?? '');
     ?>
     <div class="hero-banner">
-        <h1>Welcome, <?= h($user['full_name']) ?> 👋</h1>
+        <h1>Welcome, <?= h($user['full_name']) ?></h1>
         <p class="subtitle">
             <?= h($staff['branch_name'] ?? '') ?> &middot; Status:
             <span class="badge badge-<?= h($staff['status'] ?? 'regular') ?>"><?= h(ucfirst(str_replace('_',' ',$staff['status'] ?? ''))) ?></span>

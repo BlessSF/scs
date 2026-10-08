@@ -222,11 +222,13 @@ function branch_option_label($branch) {
  * @return void
  */
 function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
-    $s = $pdo->prepare('SELECT branch_id, excluded_days FROM staff WHERE id = ?');
+    $s = $pdo->prepare('SELECT branch_id, excluded_days, counted_months FROM staff WHERE id = ?');
     $s->execute([$staffId]);
     $row = $s->fetch();
     if (!$row) return;
     $excluded = array_filter(array_map('trim', explode(',', $row['excluded_days'] ?? '')), 'strlen');
+    // Optional month limit, e.g. "2026-08,2026-09". Empty = count every month.
+    $months = array_values(array_filter(array_map('trim', explode(',', $row['counted_months'] ?? '')), 'strlen'));
 
     // Branches this owner is assigned to: home branch + "Also assign to these branches".
     $bs = $pdo->prepare('SELECT branch_id FROM staff_branches WHERE staff_id = ?');
@@ -252,6 +254,15 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
             ->execute(array_merge([$staffId], $mysqlDays));
     }
 
+    // 2b) Remove stored rows in months this owner is NOT counted for.
+    if ($months) {
+        $phM = implode(',', array_fill(0, count($months), '?'));
+        $pdo->prepare("DELETE da FROM duty_attendance da
+            JOIN duty_days dd ON dd.id = da.duty_day_id
+            WHERE da.staff_id = ? AND DATE_FORMAT(dd.duty_date, '%Y-%m') NOT IN ($phM)")
+            ->execute(array_merge([$staffId], $months));
+    }
+
     // 3) Add rows for every duty day in assigned branches that isn't an excluded weekday.
     $sql = "INSERT IGNORE INTO duty_attendance (duty_day_id, staff_id)
             SELECT dd.id, ? FROM duty_days dd WHERE dd.branch_id IN ($phB)";
@@ -259,6 +270,10 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
     if ($excluded) {
         $sql .= " AND DAYOFWEEK(dd.duty_date) NOT IN ($phD)";
         $params = array_merge($params, $mysqlDays);
+    }
+    if ($months) {
+        $sql .= " AND DATE_FORMAT(dd.duty_date, '%Y-%m') IN ($phM)";
+        $params = array_merge($params, $months);
     }
     $pdo->prepare($sql)->execute($params);
 }
@@ -488,6 +503,60 @@ function staff_active_count_for_branch($branchId) {
 }
 
 /**
+ * Active staff from OTHER branches who can be ticked as "visiting" on this
+ * branch's duty entry (e.g. a Stella staff member sent to help at Hero for
+ * the day). Excludes anyone already on this branch's own roster (home branch
+ * or assigned via staff_branches) and hidden owner/admin staff.
+ *
+ * @param int $branchId
+ * @return array rows: staff columns + home_branch_name
+ */
+function staff_visiting_candidates($branchId) {
+    global $pdo;
+    $stmt = $pdo->prepare(
+        "SELECT s.*, b.name AS home_branch_name
+         FROM staff s
+         JOIN branches b ON b.id = s.branch_id
+         WHERE s.is_active = 1 AND s.is_hidden = 0
+           AND s.branch_id <> ?
+           AND NOT EXISTS (SELECT 1 FROM staff_branches sb WHERE sb.staff_id = s.id AND sb.branch_id = ?)
+         ORDER BY b.name, s.full_name"
+    );
+    $stmt->execute([$branchId, $branchId]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Which of THIS branch's own staff are already on duty at a DIFFERENT branch
+ * on the same date and shift? Used on the duty entry page to flag
+ * "At Hero today" next to a staff member's name and to pre-tick them, so a
+ * staff member sent elsewhere is still credited at their home branch.
+ *
+ * @param int    $branchId
+ * @param string $date   Y-m-d
+ * @param string $shift  'regular' | 'bar_night'
+ * @return array<int,string>  staff_id => "Hero, H Bar" (names of the other branches)
+ */
+function staff_on_duty_elsewhere($branchId, $date, $shift) {
+    global $pdo;
+    $stmt = $pdo->prepare(
+        "SELECT da.staff_id, GROUP_CONCAT(DISTINCT b.name ORDER BY b.name SEPARATOR ', ') AS at_branches
+         FROM duty_attendance da
+         JOIN duty_days dd ON dd.id = da.duty_day_id
+         JOIN branches b   ON b.id = dd.branch_id
+         JOIN staff s      ON s.id = da.staff_id
+         WHERE dd.duty_date = ? AND dd.shift = ? AND dd.branch_id <> ?
+           AND s.is_hidden = 0
+           AND (s.branch_id = ? OR EXISTS (SELECT 1 FROM staff_branches sb WHERE sb.staff_id = s.id AND sb.branch_id = ?))
+         GROUP BY da.staff_id"
+    );
+    $stmt->execute([$date, $shift, $branchId, $branchId, $branchId]);
+    $map = [];
+    foreach ($stmt->fetchAll() as $r) { $map[(int)$r['staff_id']] = $r['at_branches']; }
+    return $map;
+}
+
+/**
  * Number of staff on duty for a given duty_day id.
  *
  * @param PDO $pdo
@@ -525,6 +594,9 @@ function effective_attendance_sql() {
                 AND (st0.excluded_days IS NULL
                      OR st0.excluded_days = ''
                      OR FIND_IN_SET(CAST(DAYOFWEEK(dd0.duty_date) - 1 AS BINARY), CAST(REPLACE(st0.excluded_days, ' ', '') AS BINARY)) = 0)
+                AND (st0.counted_months IS NULL
+                     OR st0.counted_months = ''
+                     OR FIND_IN_SET(CAST(DATE_FORMAT(dd0.duty_date, '%Y-%m') AS BINARY), CAST(REPLACE(st0.counted_months, ' ', '') AS BINARY)) > 0)
                )
             UNION
             SELECT dd2.id AS duty_day_id, hs.id AS staff_id
@@ -534,7 +606,10 @@ function effective_attendance_sql() {
                    OR EXISTS (SELECT 1 FROM staff_branches sb2 WHERE sb2.staff_id = hs.id AND sb2.branch_id = dd2.branch_id))
               AND (hs.excluded_days IS NULL
                    OR hs.excluded_days = ''
-                   OR FIND_IN_SET(CAST(DAYOFWEEK(dd2.duty_date) - 1 AS BINARY), CAST(REPLACE(hs.excluded_days, ' ', '') AS BINARY)) = 0)";
+                   OR FIND_IN_SET(CAST(DAYOFWEEK(dd2.duty_date) - 1 AS BINARY), CAST(REPLACE(hs.excluded_days, ' ', '') AS BINARY)) = 0)
+              AND (hs.counted_months IS NULL
+                   OR hs.counted_months = ''
+                   OR FIND_IN_SET(CAST(DATE_FORMAT(dd2.duty_date, '%Y-%m') AS BINARY), CAST(REPLACE(hs.counted_months, ' ', '') AS BINARY)) > 0)";
 }
 
 function staff_total_sc($pdo, $staffId, $startDate, $endDate, $branchId = null, $shift = null) {
@@ -638,8 +713,17 @@ function period_summary($pdo, $periodId, $shift = null) {
     // period's totals here too -- not just periods of their own home branch
     // -- as long as they're active. Everyone else stays scoped to this
     // period's own branch, as before.
-    $sql = "SELECT DISTINCT s.id, s.full_name, s.status, s.is_hidden
+    //
+    // VISITING STAFF: someone whose home branch is a different branch but who
+    // was ticked on THIS branch's duty days (e.g. a Stella staff member sent
+    // to Hero for the day). They are counted in that day's divisor (see
+    // effective_attendance_sql()), so their share must be paid out from THIS
+    // branch's period -- otherwise it would silently disappear, since their
+    // home branch's period only looks at its own duty days.
+    $sql = "SELECT DISTINCT s.id, s.full_name, s.status, s.is_hidden,
+                   s.branch_id AS home_branch_id, hb.name AS home_branch_name
             FROM staff s
+            LEFT JOIN branches hb ON hb.id = s.branch_id
             WHERE (
                 s.branch_id = ?
                 AND s.id IN (
@@ -653,6 +737,10 @@ function period_summary($pdo, $periodId, $shift = null) {
                 AND (s.branch_id = ?
                      OR EXISTS (SELECT 1 FROM staff_branches sbp WHERE sbp.staff_id = s.id AND sbp.branch_id = ?))
               )
+              OR (
+                s.is_hidden = 0 AND s.branch_id <> ?
+                AND s.id IN ($dutySql)
+              )
             ORDER BY s.full_name";
     $stmt = $pdo->prepare($sql);
     $params = [$period['branch_id'], $period['start_date'], $period['end_date'], $period['branch_id']];
@@ -660,6 +748,9 @@ function period_summary($pdo, $periodId, $shift = null) {
     $params[] = $periodId;
     $params[] = $period['branch_id']; // hidden staff: home branch match
     $params[] = $period['branch_id']; // hidden staff: staff_branches match
+    $params[] = $period['branch_id']; // visiting staff: home branch is NOT this branch
+    $params[] = $period['start_date']; $params[] = $period['end_date']; $params[] = $period['branch_id'];
+    if ($shift) $params[] = $shift;
     $stmt->execute($params);
     $allStaffList  = $stmt->fetchAll();
 
@@ -736,6 +827,12 @@ function period_summary($pdo, $periodId, $shift = null) {
             'full_name'        => $s['full_name'],
             'status'           => $s['status'],
             'is_hidden'        => !empty($s['is_hidden']),
+            'home_branch_id'   => (int)($s['home_branch_id'] ?? 0),
+            'home_branch_name' => $s['home_branch_name'] ?? '',
+            // Set only for a staff member whose home branch differs from this
+            // period's branch (a visitor); null for everyone else.
+            'visiting_from'    => (empty($s['is_hidden']) && (int)($s['home_branch_id'] ?? 0) !== (int)$period['branch_id'])
+                                    ? ($s['home_branch_name'] ?? '') : null,
             'total_sc'         => $totalSc,
             'management_share' => $mgmtShare,
             'gross'            => $gross,

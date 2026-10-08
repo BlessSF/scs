@@ -43,7 +43,7 @@ fputcsv($out, ['Name', 'Status', 'Days', 'Total SC', 'Mgmt Share', 'Gross', 'Dam
 
 foreach ($rows as $r) {
     fputcsv($out, [
-        $r['full_name'],
+        $r['full_name'] . (!empty($r['visiting_from']) ? ' (visiting from ' . $r['visiting_from'] . ')' : ''),
         ucfirst(str_replace('_', ' ', $r['status'])),
         $r['days_worked'],
         number_format($r['total_sc'], 2, '.', ''),

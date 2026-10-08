@@ -4,6 +4,52 @@ require __DIR__ . '/config/auth.php';
 require __DIR__ . '/includes/functions.php';
 require_admin();
 
+$ownerReveal = $_SESSION['owner_reveal'] ?? null;
+unset($_SESSION['owner_reveal']);
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create_owner') {
+    csrf_verify();
+    $fullName = trim($_POST['owner_full_name'] ?? '');
+    $username = trim($_POST['owner_username'] ?? '');
+    $password = $_POST['owner_password'] ?? '';
+    $linkStaff = (int)($_POST['owner_staff_id'] ?? 0) ?: null;
+    if ($password === '') $password = substr(bin2hex(random_bytes(5)), 0, 10);
+    if ($fullName === '' || $username === '') {
+        flash('error', 'Owner name and username are required.');
+    } else {
+        $chk = $pdo->prepare('SELECT id FROM users WHERE username = ?');
+        $chk->execute([$username]);
+        if ($chk->fetch()) {
+            flash('error', 'That username is already taken.');
+        } else {
+            $pdo->prepare("INSERT INTO users (username, password, role, branch_id, staff_id, full_name, is_active) VALUES (?, ?, 'owner', NULL, ?, ?, 1)")
+                ->execute([$username, password_hash($password, PASSWORD_DEFAULT), $linkStaff, $fullName]);
+            $_SESSION['owner_reveal'] = ['label' => 'Owner account created', 'username' => $username, 'password' => $password];
+            flash('success', 'Owner account created.');
+        }
+    }
+    redirect('/settings.php');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reset_owner') {
+    csrf_verify();
+    $uid = (int)($_POST['user_id'] ?? 0);
+    $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'owner'");
+    $stmt->execute([$uid]);
+    if ($u = $stmt->fetch()) {
+        $password = substr(bin2hex(random_bytes(5)), 0, 10);
+        $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($password, PASSWORD_DEFAULT), $uid]);
+        $_SESSION['owner_reveal'] = ['label' => 'New password for ' . $u['full_name'], 'username' => $u['username'], 'password' => $password];
+    }
+    redirect('/settings.php');
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'toggle_owner') {
+    csrf_verify();
+    $pdo->prepare("UPDATE users SET is_active = 1 - is_active WHERE id = ? AND role = 'owner'")->execute([(int)($_POST['user_id'] ?? 0)]);
+    redirect('/settings.php');
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     set_setting('company_name', trim($_POST['company_name'] ?? ''));
@@ -58,6 +104,53 @@ require __DIR__ . '/includes/header.php';
 </div>
 
 <div class="card">
+    <h2>Owner Accounts</h2>
+    <p class="subtitle small">Owners sign in separately from admins and can only see the Dashboard and Owner Earnings.</p>
+    <?php if ($ownerReveal): ?>
+        <div class="alert alert-success">
+            <strong><?= h($ownerReveal['label']) ?></strong> &mdash; shown once, copy it now.<br>
+            Username: <code><?= h($ownerReveal['username']) ?></code> &nbsp; Password: <code><?= h($ownerReveal['password']) ?></code>
+        </div>
+    <?php endif; ?>
+    <table>
+        <thead><tr><th>Username</th><th>Name</th><th>Sees earnings of</th><th>Active</th><th></th></tr></thead>
+        <tbody>
+        <?php $owners = $pdo->query("SELECT u.*, s.full_name AS staff_name FROM users u LEFT JOIN staff s ON s.id = u.staff_id WHERE u.role = 'owner' ORDER BY u.username")->fetchAll();
+        foreach ($owners as $o): ?>
+            <tr>
+                <td><?= h($o['username']) ?></td>
+                <td><?= h($o['full_name']) ?></td>
+                <td class="small"><?= $o['staff_name'] ? h($o['staff_name']) : '<span class="muted">everyone</span>' ?></td>
+                <td><?= $o['is_active'] ? 'Yes' : 'No' ?></td>
+                <td>
+                    <form method="post" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="reset_owner"><input type="hidden" name="user_id" value="<?= (int)$o['id'] ?>"><button type="submit" class="btn btn-sm" onclick="return confirm('Generate a new password for this owner?');">Reset Password</button></form>
+                    <form method="post" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="toggle_owner"><input type="hidden" name="user_id" value="<?= (int)$o['id'] ?>"><button type="submit" class="btn btn-sm btn-secondary"><?= $o['is_active'] ? 'Disable' : 'Enable' ?></button></form>
+                </td>
+            </tr>
+        <?php endforeach; ?>
+        <?php if (!$owners): ?><tr><td colspan="5" class="muted">No owner accounts yet.</td></tr><?php endif; ?>
+        </tbody>
+    </table>
+    <form method="post" action="" style="margin-top:16px;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="create_owner">
+        <div class="form-row">
+            <div><label for="owner_full_name">Owner Name</label><input type="text" id="owner_full_name" name="owner_full_name" required></div>
+            <div><label for="owner_username">Username</label><input type="text" id="owner_username" name="owner_username" required></div>
+            <div><label for="owner_password">Password (blank = auto-generate)</label><input type="text" id="owner_password" name="owner_password" autocomplete="off"></div>
+        </div>
+        <label for="owner_staff_id">Owner's staff record (they see only their own earnings)</label>
+        <select id="owner_staff_id" name="owner_staff_id">
+            <option value="">— none: sees everyone's earnings —</option>
+            <?php foreach ($pdo->query("SELECT id, full_name FROM staff WHERE is_hidden = 1 ORDER BY full_name") as $hs): ?>
+                <option value="<?= (int)$hs['id'] ?>"><?= h($hs['full_name']) ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="btn">+ Add Owner Account</button>
+    </form>
+</div>
+
+<div class="card">
     <h2>All Login Accounts</h2>
     <p class="subtitle small">Branch accounts are managed from the <a href="<?= BASE_URL ?>/branches/list.php">Branches</a> page; staff accounts from <a href="<?= BASE_URL ?>/staff/list.php">Staff</a>.</p>
     <table>
@@ -70,7 +163,7 @@ require __DIR__ . '/includes/header.php';
                 <td><?= h($u['username']) ?></td>
                 <td><?= h($u['full_name']) ?></td>
                 <td><?= h($u['role']) ?></td>
-                <td class="small"><?= $u['branch_name'] ? h($u['branch_name']) : '<span class="muted">' . ($u['role'] === 'cashier' ? 'all branches' : '—') . '</span>' ?></td>
+                <td class="small"><?= $u['branch_name'] ? h($u['branch_name']) : '<span class="muted">' . (in_array($u['role'], ['cashier','owner'], true) ? 'all branches' : '—') . '</span>' ?></td>
                 <td><?= $u['is_active'] ? 'Yes' : 'No' ?></td>
             </tr>
         <?php endforeach; ?>

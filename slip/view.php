@@ -33,6 +33,27 @@ $period = $slip['period'];
 $row = $slip['row'];
 $branch = get_branch($period['branch_id']);
 
+// If this person is limited to certain months (Staff > Edit > "Only Count in
+// These Months"), list those months so the slip shows what was counted.
+$countedLabel = '';
+try {
+    $cmStmt = $pdo->prepare('SELECT counted_months FROM staff WHERE id = ?');
+    $cmStmt->execute([$staffId]);
+    $cmRaw = (string)$cmStmt->fetchColumn();
+    $cmNames = [];
+    foreach (array_filter(array_map('trim', explode(',', $cmRaw)), 'strlen') as $ym) {
+        $ts = strtotime($ym . '-01');
+        if (!$ts) continue;
+        // Only months that fall inside this period's date range
+        if (date('Y-m', $ts) < date('Y-m', strtotime($period['start_date']))) continue;
+        if (date('Y-m', $ts) > date('Y-m', strtotime($period['end_date']))) continue;
+        $cmNames[] = date('F Y', $ts);
+    }
+    $countedLabel = implode(', ', $cmNames);
+} catch (Exception $e) {
+    $countedLabel = '';
+}
+
 $pageTitle = 'Slip — ' . $row['full_name'];
 require __DIR__ . '/../includes/header.php';
 ?>
@@ -47,6 +68,9 @@ require __DIR__ . '/../includes/header.php';
     <div class="slip-row"><span>Name</span><strong><?= h($row['full_name']) ?></strong></div>
     <div class="slip-row"><span>Branch</span><span><?= h($branch['name'] ?? '') ?></span></div>
     <div class="slip-row"><span>Covered Period</span><span><?= h(date('M j', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?></span></div>
+    <?php if ($countedLabel !== ''): ?>
+    <div class="slip-row"><span>Months Counted</span><strong><?= h($countedLabel) ?></strong></div>
+    <?php endif; ?>
     <div class="slip-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
     <div class="slip-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= $row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>
     <div class="slip-row"><span>Bar Night SC (<?= (int)$row['bar_night_days'] ?> day<?= $row['bar_night_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['bar_night_sc']) ?></span></div>

@@ -135,7 +135,7 @@ $company = get_setting('company_name', APP_NAME);
                 <tbody>
                 <?php foreach ($rows as $r): ?>
                     <tr>
-                        <td><?= h($r['full_name']) ?></td>
+                        <td><?= h($r['full_name'] . (!empty($r['visiting_from']) ? ' (visiting from ' . $r['visiting_from'] . ')' : '')) ?></td>
                         <td><span class="badge"><?= h(ucfirst(str_replace('_', ' ', $r['status']))) ?></span></td>
                         <td class="num"><?= (int)$r['days_worked'] ?></td>
                         <td class="num"><?= money($r['total_sc']) ?></td>

@@ -76,7 +76,7 @@ function xcell($val) { return h($val); }
     </tr>
     <?php foreach ($rows as $r): ?>
     <tr>
-        <td><?= xcell($r['full_name']) ?></td>
+        <td><?= xcell($r['full_name'] . (!empty($r['visiting_from']) ? ' (visiting from ' . $r['visiting_from'] . ')' : '')) ?></td>
         <td><?= xcell(ucfirst(str_replace('_', ' ', $r['status']))) ?></td>
         <td class="num"><?= (int)$r['days_worked'] ?></td>
         <td class="num"><?= number_format($r['total_sc'], 2, '.', '') ?></td>

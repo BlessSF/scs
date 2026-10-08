@@ -5,7 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 
 header('Content-Type: application/json');
 
-if (!is_logged_in() || (!is_admin() && !is_cashier())) {
+if (!is_logged_in() || (!is_admin() && !is_cashier() && !is_owner())) {
     http_response_code(403);
     echo json_encode(['error' => 'Access denied']);
     exit;

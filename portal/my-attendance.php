@@ -5,7 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 require_login();
 
 $user = current_user();
-if ($user['role'] === 'admin') { redirect('/dashboard.php'); }
+if ($user['role'] === 'admin' || $user['role'] === 'owner') { redirect('/dashboard.php'); }
 $staffId = $user['staff_id'];
 
 $month = isset($_GET['month']) ? (int)$_GET['month'] : (int)date('n');

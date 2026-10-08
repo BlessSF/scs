@@ -7,7 +7,7 @@ require_role(['admin', 'cashier']);
 $id = isset($_GET['id']) ? (int)$_GET['id'] : (isset($_POST['id']) ? (int)$_POST['id'] : 0);
 $branches = visible_branches(false);
 $defaultBranchId = scoped_branch_id($_GET['branch_id'] ?? ($branches[0]['id'] ?? 1));
-$staff = ['branch_id' => $defaultBranchId, 'full_name' => '', 'status' => 'regular', 'remarks' => '', 'date_added' => date('Y-m-d'), 'is_active' => 1, 'is_hidden' => 0, 'excluded_days' => ''];
+$staff = ['branch_id' => $defaultBranchId, 'full_name' => '', 'status' => 'regular', 'remarks' => '', 'date_added' => date('Y-m-d'), 'is_active' => 1, 'is_hidden' => 0, 'excluded_days' => '', 'counted_months' => ''];
 $account = ['username' => ''];
 
 if ($id) {
@@ -40,6 +40,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $rawDays = $_POST['excluded_days'] ?? [];
         $validDays = array_filter(array_map('intval', (array)$rawDays), function($d) { return $d >= 0 && $d <= 6; });
         $staff['excluded_days'] = implode(',', $validDays);
+
+        // Optional: only count this owner in specific months of a given year.
+        $cmYear = (int)($_POST['counted_year'] ?? date('Y'));
+        if ($cmYear < 2000 || $cmYear > 2100) $cmYear = (int)date('Y');
+        $cmList = [];
+        foreach ((array)($_POST['counted_months'] ?? []) as $m) {
+            $m = (int)$m;
+            if ($m >= 1 && $m <= 12) $cmList[$m] = sprintf('%04d-%02d', $cmYear, $m);
+        }
+        ksort($cmList);
+        $staff['counted_months'] = implode(',', $cmList);
     }
     $extraBranchIds = array_map('intval', $_POST['extra_branch_ids'] ?? []);
 
@@ -55,11 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         if ($id) {
-            $stmt = $pdo->prepare('UPDATE staff SET branch_id=?, full_name=?, status=?, remarks=?, date_added=?, is_active=?, is_hidden=?, excluded_days=? WHERE id=?');
-            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $id]);
+            $stmt = $pdo->prepare('UPDATE staff SET branch_id=?, full_name=?, status=?, remarks=?, date_added=?, is_active=?, is_hidden=?, excluded_days=?, counted_months=? WHERE id=?');
+            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months'], $id]);
         } else {
-            $stmt = $pdo->prepare('INSERT INTO staff (branch_id, full_name, status, remarks, date_added, is_active, is_hidden, excluded_days) VALUES (?,?,?,?,?,?,?,?)');
-            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days']]);
+            $stmt = $pdo->prepare('INSERT INTO staff (branch_id, full_name, status, remarks, date_added, is_active, is_hidden, excluded_days, counted_months) VALUES (?,?,?,?,?,?,?,?,?)');
+            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months']]);
             $id = (int)$pdo->lastInsertId();
         }
 
@@ -178,7 +189,7 @@ require __DIR__ . '/../includes/header.php';
                 <button type="button" class="btn btn-sm btn-secondary" id="extraBranchSelectAll">Select all</button>
                 <button type="button" class="btn btn-sm btn-secondary" id="extraBranchClearAll">Clear</button>
             </div>
-            <div class="staff-select-list" id="extraBranchList" style="max-height:180px;">
+            <div class="staff-select-list" id="extraBranchList">
                 <?php foreach ($branches as $b): ?>
                     <label class="staff-row<?= in_array((int)$b['id'], $extraBranchIds, true) ? ' is-checked' : '' ?>">
                         <input type="checkbox" name="extra_branch_ids[]" value="<?= $b['id'] ?>" <?= in_array((int)$b['id'], $extraBranchIds, true) ? 'checked' : '' ?>>
@@ -275,6 +286,28 @@ require __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </div>
             <p class="small" style="color:var(--muted); margin-top:6px;">Leave all unchecked to count this owner every day.</p>
+
+            <?php
+                $cmArr = array_filter(array_map('trim', explode(',', $staff['counted_months'] ?? '')), 'strlen');
+                $cmYear = $cmArr ? (int)substr(reset($cmArr), 0, 4) : (int)date('Y');
+                $cmSel = [];
+                foreach ($cmArr as $ym) { if ((int)substr($ym, 0, 4) === $cmYear) $cmSel[(int)substr($ym, 5, 2)] = true; }
+                $monthNames = [1=>'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+            ?>
+            <label style="margin:14px 0 6px; display:block;">Only Count in These Months <span style="font-weight:400; color:var(--muted);">(limit this owner to certain months)</span></label>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <span style="font-weight:400;">Year</span>
+                <input type="number" name="counted_year" value="<?= $cmYear ?>" min="2000" max="2100" style="width:90px;">
+                <?php foreach ($monthNames as $num => $name): ?>
+                <label style="display:flex; align-items:center; gap:5px; font-weight:400; cursor:pointer;">
+                    <input type="checkbox" name="counted_months[]" value="<?= $num ?>"
+                        <?= isset($cmSel[$num]) ? 'checked' : '' ?>
+                        style="width:16px; height:16px; cursor:pointer;">
+                    <?= $name ?>
+                </label>
+                <?php endforeach; ?>
+            </div>
+            <p class="small" style="color:var(--muted); margin-top:6px;">Leave all unchecked to count this owner in every month. Example: check Aug and Sep so a Jul&ndash;Sep period only counts her for those two months.</p>
         </div>
         <script>
         (function(){

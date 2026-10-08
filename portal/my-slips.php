@@ -7,7 +7,7 @@ require_login();
 $user = current_user();
 // My Slips is no longer available to staff accounts -- attendance is all
 // they see now; slips stay admin-only territory.
-if ($user['role'] === 'admin' || $user['role'] === 'staff') { redirect('/dashboard.php'); }
+if (in_array($user['role'], ['admin', 'staff', 'owner'], true)) { redirect('/dashboard.php'); }
 $staffId = $user['staff_id'];
 
 $stmt = $pdo->prepare('SELECT branch_id FROM staff WHERE id = ?');

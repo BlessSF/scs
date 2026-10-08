@@ -16,6 +16,11 @@ function is_admin() {
     return is_logged_in() && $_SESSION['user']['role'] === 'admin';
 }
 
+function is_owner() {
+    return is_logged_in() && $_SESSION['user']['role'] === 'owner';
+}
+
+/** Owners are never branch-locked; they see company-wide totals. */
 function is_cashier() {
     return is_logged_in() && $_SESSION['user']['role'] === 'cashier';
 }
@@ -93,6 +98,14 @@ function require_login() {
     if (!is_logged_in()) {
         header('Location: ' . BASE_URL . '/login.php');
         exit;
+    }
+}
+
+function require_owner() {
+    require_login();
+    if (!is_owner()) {
+        http_response_code(403);
+        die('Access denied. This page is for owners only.');
     }
 }
 

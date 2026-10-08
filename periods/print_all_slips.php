@@ -145,6 +145,9 @@ require __DIR__ . '/../includes/header.php';
 
             <div class="ps-row"><span>Name</span><strong><?= h($row['full_name']) ?></strong></div>
             <div class="ps-row"><span>Branch</span><span><?= h($branch['name'] ?? '') ?></span></div>
+            <?php if (!empty($row['visiting_from'])): ?>
+            <div class="ps-row"><span>Home Branch</span><span><?= h($row['visiting_from']) ?> (visiting)</span></div>
+            <?php endif; ?>
             <div class="ps-row"><span>Covered Period</span><span><?= h(date('M j', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?></span></div>
             <div class="ps-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
             <div class="ps-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= (int)$row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>

@@ -2,7 +2,8 @@
 require __DIR__ . '/../config/config.php';
 require __DIR__ . '/../config/auth.php';
 require __DIR__ . '/../includes/functions.php';
-require_admin();
+require_role(['admin', 'owner']);
+$viewerIsOwner = is_owner(); // owners see the numbers only -- no slip / period drill-downs yet
 
 // All hidden staff (owners / other admins) -- usually homed in the
 // "Shared" branch, but this also picks up anyone marked "Hidden" from
@@ -14,6 +15,13 @@ $hiddenStaff = $pdo->query("SELECT s.*, b.name AS branch_name
     FROM staff s JOIN branches b ON b.id = s.branch_id
     WHERE s.is_hidden = 1
     ORDER BY s.is_active DESC, s.full_name")->fetchAll();
+
+// An owner login linked to a staff record sees ONLY that person's earnings.
+// (An owner login with no linked staff, and admins, see everyone.)
+$ownLinkedStaffId = $viewerIsOwner ? (int)(current_user()['staff_id'] ?? 0) : 0;
+if ($ownLinkedStaffId) {
+    $hiddenStaff = array_values(array_filter($hiddenStaff, fn($s) => (int)$s['id'] === $ownLinkedStaffId));
+}
 
 // Every period, across every branch -- we need to run period_summary()
 // for each one and pull out just the hidden-staff rows, since the net
@@ -80,7 +88,7 @@ require __DIR__ . '/../includes/header.php';
 <?php if (!$hiddenStaff): ?>
     <div class="card" style="text-align:center; padding:40px 20px;">
         <p class="muted" style="margin:0 0 12px;">No hidden owner/admin staff yet.</p>
-        <a class="btn" href="<?= BASE_URL ?>/staff/form.php">+ Add one from the Shared branch</a>
+        <?php if (!$viewerIsOwner): ?><a class="btn" href="<?= BASE_URL ?>/staff/form.php">+ Add one from the Shared branch</a><?php endif; ?>
     </div>
 <?php endif; ?>
 
@@ -135,6 +143,7 @@ require __DIR__ . '/../includes/header.php';
                     <td class="text-right"><?= money($r['damages_charges'] + $r['cash_advance'] + $r['overcost_cogs']) ?></td>
                     <td class="text-right"><strong><?= money($r['net']) ?></strong></td>
                     <td>
+                        <?php if (!$viewerIsOwner): ?>
                         <div style="display:flex; gap:6px; align-items:center;">
                         <a href="<?= BASE_URL ?>/slip/view.php?period_id=<?= $r['period_id'] ?>&staff_id=<?= $s['id'] ?>"
                            class="btn btn-sm" title="Slip"
@@ -143,6 +152,7 @@ require __DIR__ . '/../includes/header.php';
                            class="btn btn-sm" title="Period"
                            style="width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center; font-size:16px;">📅</a>
                         </div>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>

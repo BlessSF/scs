@@ -36,15 +36,11 @@ $stmt = $pdo->prepare("SELECT dd.duty_date,
                             FROM duty_attendance da
                             JOIN staff s ON s.id = da.staff_id
                             WHERE s.is_hidden = 0
-                              AND (s.branch_id = ? OR EXISTS (
-                                  SELECT 1 FROM staff_branches sb
-                                  WHERE sb.staff_id = s.id AND sb.branch_id = ?
-                              ))
                             GROUP BY da.duty_day_id
                         ) ac ON ac.duty_day_id = dd.id
                         WHERE dd.duty_date BETWEEN ? AND ? AND dd.branch_id = ?
                         GROUP BY dd.duty_date");
-$stmt->execute([$branchId, $branchId, $firstOfMonth, date('Y-m-t', strtotime($firstOfMonth)), $branchId]);
+$stmt->execute([$firstOfMonth, date('Y-m-t', strtotime($firstOfMonth)), $branchId]);
 $recorded = [];
 foreach ($stmt->fetchAll() as $r) {
     $recorded[$r['duty_date']] = $r;
