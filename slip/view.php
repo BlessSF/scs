@@ -71,9 +71,6 @@ require __DIR__ . '/../includes/header.php';
     <?php if ($countedLabel !== ''): ?>
     <div class="slip-row"><span>Months Counted</span><strong><?= h($countedLabel) ?></strong></div>
     <?php endif; ?>
-    <div class="slip-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
-    <div class="slip-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= $row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>
-    <div class="slip-row"><span>Bar Night SC (<?= (int)$row['bar_night_days'] ?> day<?= $row['bar_night_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['bar_night_sc']) ?></span></div>
     <div class="slip-row total"><span>GROSS SERVICE CHARGE</span><span><?= money($row['gross']) ?></span></div>
 
     <?php if ((float)$row['damages_charges'] > 0): ?>

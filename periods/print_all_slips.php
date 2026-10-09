@@ -168,9 +168,6 @@ require __DIR__ . '/../includes/header.php';
             <div class="ps-row"><span>Home Branch</span><span><?= h($row['visiting_from']) ?> (visiting)</span></div>
             <?php endif; ?>
             <div class="ps-row"><span>Covered Period</span><span><?= h(date('M j', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?></span></div>
-            <div class="ps-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
-            <div class="ps-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= (int)$row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>
-            <div class="ps-row"><span>Bar Night SC (<?= (int)$row['bar_night_days'] ?> day<?= (int)$row['bar_night_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['bar_night_sc']) ?></span></div>
             <div class="ps-row total"><span>GROSS SERVICE CHARGE</span><span><?= money($row['gross']) ?></span></div>
 
             <?php if ((float)$row['damages_charges'] > 0): ?>
