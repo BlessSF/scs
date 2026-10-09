@@ -20,7 +20,32 @@ $rows = $summary['rows'];
 $totals = $summary['totals'];
 $overcost = $summary['overcost'];
 
+// ---- Employment-status filter (Regular / Probationary / Not regular / Resigned) ----
+// Overcost per employee was already computed from ALL staff above, so filtering the
+// rows afterwards never changes anyone's figures — it only changes what is listed/totalled.
+$STATUS_LABELS = ['regular' => 'Regular', 'probationary' => 'Probationary', 'not_regular' => 'Not regular', 'resigned' => 'Resigned'];
+$st = $_GET['st'] ?? '';
+$st = isset($STATUS_LABELS[$st]) ? $st : '';
+$statusSummary = [];
+foreach ($STATUS_LABELS as $k => $lbl) $statusSummary[$k] = ['count' => 0, 'gross' => 0.0, 'net' => 0.0];
+foreach ($rows as $r) {
+    $k = isset($STATUS_LABELS[$r['status']]) ? $r['status'] : null;
+    if ($k === null) continue;
+    $statusSummary[$k]['count']++;
+    $statusSummary[$k]['gross'] += (float)$r['gross'];
+    $statusSummary[$k]['net']   += (float)$r['net'];
+}
+$allCount = count($rows);
+if ($st !== '') {
+    $rows = array_values(array_filter($rows, fn($r) => $r['status'] === $st));
+    foreach (['total_sc','management_share','gross','damages_charges','cash_advance','overcost_cogs','net'] as $c) {
+        $totals[$c] = array_sum(array_column($rows, $c));
+    }
+}
+
 $qs = $shift ? '&shift=' . urlencode($shift) : '';
+$stQs = $st !== '' ? '&st=' . urlencode($st) : '';
+$baseUrl = BASE_URL . '/periods/view.php?id=' . $period['id'] . $qs;
 
 $pageTitle = $period['name'];
 require __DIR__ . '/../includes/header.php';
@@ -48,8 +73,38 @@ require __DIR__ . '/../includes/header.php';
     <a class="btn" href="<?= BASE_URL ?>/periods/export_csv.php?id=<?= $period['id'] ?><?= $qs ?>">⬇ Export CSV</a>
     <a class="btn" href="<?= BASE_URL ?>/periods/export_excel.php?id=<?= $period['id'] ?><?= $qs ?>">⬇ Export Excel</a>
     <a class="btn" href="<?= BASE_URL ?>/periods/export_print.php?id=<?= $period['id'] ?><?= $qs ?>" target="_blank" rel="noopener">🖨 Print / PDF</a>
-    <a class="btn" href="<?= BASE_URL ?>/periods/print_all_slips.php?id=<?= $period['id'] ?><?= $qs ?>" target="_blank" rel="noopener">🧾 Print All Slips</a>
+    <a class="btn" href="<?= BASE_URL ?>/periods/print_all_slips.php?id=<?= $period['id'] ?><?= $qs . $stQs ?>" target="_blank" rel="noopener">🧾 Print <?= $st !== '' ? h($STATUS_LABELS[$st]) . ' ' : 'All ' ?>Slips</a>
 </div>
+
+<div class="card">
+    <h2>By Employment Status</h2>
+    <p class="muted" style="margin-top:-6px;">Click a status to list only those staff. Totals below follow the filter. Use <strong>Print slips</strong> to print just that group.</p>
+    <table style="width:100%; font-size:0.85rem; border-collapse:collapse;">
+        <thead><tr><th>Status</th><th class="text-right">Staff</th><th class="text-right">Gross</th><th class="text-right">Net</th><th></th></tr></thead>
+        <tbody>
+        <tr<?= $st === '' ? ' style="background:#e6f4ec; color:#12372a;"' : '' ?>>
+            <td><a href="<?= $baseUrl ?>" style="color:#12372a;"><strong>All staff</strong></a></td>
+            <td class="text-right"><?= $allCount ?></td>
+            <td class="text-right"><?= money(array_sum(array_column($statusSummary, 'gross'))) ?></td>
+            <td class="text-right"><strong><?= money(array_sum(array_column($statusSummary, 'net'))) ?></strong></td>
+            <td class="text-right"><a class="btn btn-sm" href="<?= BASE_URL ?>/periods/print_all_slips.php?id=<?= $period['id'] ?><?= $qs ?>" target="_blank" rel="noopener">🧾 Print slips</a></td>
+        </tr>
+        <?php foreach ($STATUS_LABELS as $k => $lbl): $ss = $statusSummary[$k]; ?>
+        <tr<?= $st === $k ? ' style="background:#e6f4ec; color:#12372a;"' : '' ?>>
+            <td><a href="<?= $baseUrl ?>&st=<?= $k ?>"><span class="badge badge-<?= $k ?>"><?= h($lbl) ?></span></a></td>
+            <td class="text-right"><?= $ss['count'] ?></td>
+            <td class="text-right"><?= money($ss['gross']) ?></td>
+            <td class="text-right"><strong><?= money($ss['net']) ?></strong></td>
+            <td class="text-right"><a class="btn btn-sm" href="<?= BASE_URL ?>/periods/print_all_slips.php?id=<?= $period['id'] ?><?= $qs ?>&st=<?= $k ?>" target="_blank" rel="noopener">🧾 Print slips</a></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+</div>
+
+<?php if ($st !== ''): ?>
+<p class="subtitle" style="margin:0 0 10px;">Showing <strong><?= h($STATUS_LABELS[$st]) ?></strong> only (<?= count($rows) ?> of <?= $allCount ?> staff) &middot; <a href="<?= $baseUrl ?>">show all</a></p>
+<?php endif; ?>
 
 <div class="stat-grid">
     <div class="stat-card"><div class="stat-value"><?= money($totals['total_sc']) ?></div><div class="stat-label">Total SC (before mgmt share)</div></div>
@@ -150,7 +205,7 @@ require __DIR__ . '/../includes/header.php';
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-            <tr><td colspan="14" class="muted">No duty records fall within this period's date range yet for this branch.</td></tr>
+            <tr><td colspan="14" class="muted"><?= $st !== '' ? 'No ' . h(strtolower($STATUS_LABELS[$st])) . ' staff in this period.' : 'No duty records fall within this period\'s date range yet for this branch.' ?></td></tr>
         <?php endif; ?>
         </tbody>
         <?php if ($rows): ?>

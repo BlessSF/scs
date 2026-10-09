@@ -16,13 +16,21 @@ $period = $summary['period'];
 require_branch_access($period['branch_id']);
 $branch = get_branch($period['branch_id']);
 $rows = $summary['rows'];
+// Optional filter: print only one employment status (regular / probationary / not_regular / resigned)
+$STATUS_LABELS = ['regular' => 'Regular', 'probationary' => 'Probationary', 'not_regular' => 'Not regular', 'resigned' => 'Resigned'];
+$st = $_GET['st'] ?? '';
+$st = isset($STATUS_LABELS[$st]) ? $st : '';
+$allCount = count($rows);
+$statusCounts = array_fill_keys(array_keys($STATUS_LABELS), 0);
+foreach ($rows as $r) { if (isset($statusCounts[$r['status']])) $statusCounts[$r['status']]++; }
+if ($st !== '') $rows = array_values(array_filter($rows, fn($r) => $r['status'] === $st));
 $themeKey = branch_theme_key($branch['name'] ?? '');
 $colors = branch_theme_colors($themeKey);
 $companyName = get_setting('company_name', '');
 $approvedBy = get_setting('approved_by_name', '');
 
-// 4 slips per sheet of bond paper (2 columns x 2 rows)
-$sheets = array_chunk($rows, 4);
+// 6 slips per sheet of bond paper (2 columns x 3 rows)
+$sheets = array_chunk($rows, 6);
 $sheetCount = count($sheets);
 
 $pageTitle = 'All Slips — ' . $period['name'];
@@ -56,27 +64,27 @@ require __DIR__ . '/../includes/header.php';
     width: var(--paper-w); height: var(--paper-h);
     background: #fff; box-shadow: 0 4px 18px rgba(0,0,0,.18);
     margin: 0 auto 28px; padding: .3in; box-sizing: border-box;
-    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(3, 1fr);
     position: relative; overflow: hidden;
 }
 /* dashed cut guides */
 .sheet::before, .sheet::after { content: ""; position: absolute; pointer-events: none; }
 .sheet::before { left: 50%; top: .15in; bottom: .15in; border-left: 1px dashed #bbb; }
-.sheet::after  { top: 50%; left: .15in; right: .15in; border-top: 1px dashed #bbb; }
+.sheet::after  { top: calc(.3in + (100% - .6in) / 3); left: .15in; right: .15in; height: calc((100% - .6in) / 3); border-top: 1px dashed #bbb; border-bottom: 1px dashed #bbb; box-sizing: content-box; }
 
 .sheet .ps {
-    margin: .12in; padding: .16in .2in; box-sizing: border-box;
+    margin: .07in; padding: .09in .16in; box-sizing: border-box;
     border: 1px solid #cfd6dc; border-radius: 6px;
     display: flex; flex-direction: column; overflow: hidden;
-    font-size: 9.5pt; color: #111; line-height: 1.25;
+    font-size: 8.5pt; color: #111; line-height: 1.2;
     -webkit-print-color-adjust: exact; print-color-adjust: exact;
 }
 .sheet .ps-empty { border: none; }
-.ps h2 { font-size: 11pt; text-align: center; margin: 0 0 8px; line-height: 1.2; }
-.ps-row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed #ccc; }
+.ps h2 { font-size: 10pt; text-align: center; margin: 0 0 4px; line-height: 1.15; }
+.ps-row { display: flex; justify-content: space-between; gap: 8px; padding: 1.5px 0; border-bottom: 1px dashed #ccc; }
 .ps-row > :last-child { text-align: right; white-space: nowrap; }
-.ps-row.total { border-top: 1.5px solid #222; border-bottom: none; font-weight: 800; font-size: 10pt; margin-top: 3px; padding-top: 5px; }
-.ps-sig { margin-top: auto; padding-top: 18px; display: flex; justify-content: space-between; font-size: 8.5pt; }
+.ps-row.total { border-top: 1.5px solid #222; border-bottom: none; font-weight: 800; font-size: 9pt; margin-top: 2px; padding-top: 3px; }
+.ps-sig { margin-top: auto; padding-top: 10px; display: flex; justify-content: space-between; font-size: 7.5pt; }
 .ps-sig div { border-top: 1px solid #222; width: 46%; text-align: center; padding-top: 3px; }
 .ps-sig-name { display: block; font-weight: 700; min-height: 1.1em; }
 
@@ -96,17 +104,28 @@ require __DIR__ . '/../includes/header.php';
 <div class="no-print">
     <div class="actions">
         <button class="btn" onclick="window.print()">🖨 Print All Slips</button>
-        <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $shift ? '&shift='.urlencode($shift) : '' ?>">Back to Period</a>
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $shift ? '&shift='.urlencode($shift) : '' ?><?= $st !== '' ? '&st='.urlencode($st) : '' ?>">Back to Period</a>
     </div>
 
     <h1><?= h($branch['name'] ?? '') ?> — <?= h($period['name']) ?></h1>
     <p class="subtitle">
         <?= count($rows) ?> slip<?= count($rows) === 1 ? '' : 's' ?> on
-        <?= $sheetCount ?> sheet<?= $sheetCount === 1 ? '' : 's' ?> of bond paper (4 slips per sheet).
+        <?= $sheetCount ?> sheet<?= $sheetCount === 1 ? '' : 's' ?> of bond paper (6 slips per sheet).
         <?php if ($shift): ?> Filtered: <?= h($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only') ?><?php endif; ?>
+        <?php if ($st !== ''): ?> Printing <strong><?= h($STATUS_LABELS[$st]) ?></strong> only (<?= count($rows) ?> of <?= $allCount ?> staff).<?php endif; ?>
     </p>
 
     <div class="pp-toolbar">
+        <div>
+            <label for="ppStatus">Print</label>
+            <select id="ppStatus" onchange="location.href=this.value">
+                <?php $stBase = BASE_URL . '/periods/print_all_slips.php?id=' . $period['id'] . ($shift ? '&shift=' . urlencode($shift) : ''); ?>
+                <option value="<?= h($stBase) ?>"<?= $st === '' ? ' selected' : '' ?>>All staff (<?= $allCount ?>)</option>
+                <?php foreach ($STATUS_LABELS as $k => $lbl): ?>
+                <option value="<?= h($stBase . '&st=' . $k) ?>"<?= $st === $k ? ' selected' : '' ?>><?= h($lbl) ?> only (<?= $statusCounts[$k] ?>)</option>
+                <?php endforeach; ?>
+            </select>
+        </div>
         <div>
             <label for="ppPaper">Paper</label>
             <select id="ppPaper">
@@ -136,7 +155,7 @@ require __DIR__ . '/../includes/header.php';
     <?php foreach ($sheets as $si => $sheetRows): ?>
     <p class="pp-sheet-label no-print">Sheet <?= $si + 1 ?> of <?= $sheetCount ?></p>
     <div class="sheet">
-        <?php for ($k = 0; $k < 4; $k++): $row = $sheetRows[$k] ?? null; ?>
+        <?php for ($k = 0; $k < 6; $k++): $row = $sheetRows[$k] ?? null; ?>
         <?php if (!$row): ?>
             <div class="ps ps-empty"></div>
         <?php else: ?>
