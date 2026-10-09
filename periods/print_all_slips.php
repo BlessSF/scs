@@ -171,7 +171,7 @@ require __DIR__ . '/../includes/header.php';
             <div class="ps-row"><span>Days on Duty</span><span><?= (int)$row['regular_days'] + (int)$row['bar_night_days'] ?></span></div>
             <div class="ps-row"><span>Regular Day SC (<?= (int)$row['regular_days'] ?> day<?= (int)$row['regular_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['regular_sc']) ?></span></div>
             <div class="ps-row"><span>Bar Night SC (<?= (int)$row['bar_night_days'] ?> day<?= (int)$row['bar_night_days'] === 1 ? '' : 's' ?>)</span><span><?= money($row['bar_night_sc']) ?></span></div>
-            <div class="ps-row total"><span>GROSS SERVICE CHARGE</span><span><?= money($row['combined_total_sc']) ?></span></div>
+            <div class="ps-row total"><span>GROSS SERVICE CHARGE</span><span><?= money($row['gross']) ?></span></div>
 
             <?php if ((float)$row['damages_charges'] > 0): ?>
             <div class="ps-row"><span>Damages &amp; Charges</span><span>&minus; <?= money($row['damages_charges']) ?></span></div>
