@@ -32,6 +32,9 @@ function nav_active($needle, $here) { return strpos($here, $needle) !== false ? 
                 <a<?= nav_active('/owners/', $__here) ?> href="<?= BASE_URL ?>/owners/earnings.php">Owner Earnings</a>
                 <a<?= nav_active('/duty/', $__here) ?> href="<?= BASE_URL ?>/duty/calendar.php">Duty Entry</a>
                 <a<?= nav_active('/periods/', $__here) ?> href="<?= BASE_URL ?>/periods/list.php">Periods</a>
+                <?php if (($user['username'] ?? '') === 'admin'): /* Claribel's account only */ ?>
+                    <a<?= nav_active('/summary/', $__here) ?> href="<?= BASE_URL ?>/summary/daily.php">Daily Summary</a>
+                <?php endif; ?>
                 <a<?= nav_active('settings.php', $__here) ?> href="<?= BASE_URL ?>/settings.php">Settings</a>
             <?php elseif ($user['role'] === 'owner'): ?>
                 <a<?= nav_active('dashboard.php', $__here) ?> href="<?= BASE_URL ?>/dashboard.php">Dashboard</a>

@@ -222,13 +222,16 @@ function branch_option_label($branch) {
  * @return void
  */
 function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
-    $s = $pdo->prepare('SELECT branch_id, excluded_days, counted_months FROM staff WHERE id = ?');
+    $s = $pdo->prepare('SELECT branch_id, excluded_days, counted_months, follow_staff_id FROM staff WHERE id = ?');
     $s->execute([$staffId]);
     $row = $s->fetch();
     if (!$row) return;
     $excluded = array_filter(array_map('trim', explode(',', $row['excluded_days'] ?? '')), 'strlen');
     // Optional month limit, e.g. "2026-08,2026-09". Empty = count every month.
     $months = array_values(array_filter(array_map('trim', explode(',', $row['counted_months'] ?? '')), 'strlen'));
+
+    // Optional "follow" person: only count on dates this staff member worked.
+    $followId = (int)($row['follow_staff_id'] ?? 0);
 
     // Branches this owner is assigned to: home branch + "Also assign to these branches".
     $bs = $pdo->prepare('SELECT branch_id FROM staff_branches WHERE staff_id = ?');
@@ -263,6 +266,24 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
             ->execute(array_merge([$staffId], $months));
     }
 
+    // 2c) Follow mode: remove stored rows on dates the followed person did NOT work.
+    //     (Look the ids up first, then delete by id -- MySQL won't let a DELETE
+    //     read from the same table in a subquery.)
+    if ($followId) {
+        $sel = $pdo->prepare("SELECT da.id FROM duty_attendance da
+            JOIN duty_days dd ON dd.id = da.duty_day_id
+            WHERE da.staff_id = ?
+              AND NOT EXISTS (SELECT 1 FROM duty_attendance f
+                              JOIN duty_days fd ON fd.id = f.duty_day_id
+                              WHERE f.staff_id = ? AND fd.duty_date = dd.duty_date)");
+        $sel->execute([$staffId, $followId]);
+        $delIds = array_map('intval', $sel->fetchAll(PDO::FETCH_COLUMN));
+        foreach (array_chunk($delIds, 500) as $chunk) {
+            $phX = implode(',', array_fill(0, count($chunk), '?'));
+            $pdo->prepare("DELETE FROM duty_attendance WHERE id IN ($phX)")->execute($chunk);
+        }
+    }
+
     // 3) Add rows for every duty day in assigned branches that isn't an excluded weekday.
     $sql = "INSERT IGNORE INTO duty_attendance (duty_day_id, staff_id)
             SELECT dd.id, ? FROM duty_days dd WHERE dd.branch_id IN ($phB)";
@@ -274,6 +295,11 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
     if ($months) {
         $sql .= " AND DATE_FORMAT(dd.duty_date, '%Y-%m') IN ($phM)";
         $params = array_merge($params, $months);
+    }
+    if ($followId) {
+        $sql .= " AND EXISTS (SELECT 1 FROM duty_attendance f JOIN duty_days fd ON fd.id = f.duty_day_id
+                              WHERE f.staff_id = ? AND fd.duty_date = dd.duty_date)";
+        $params[] = $followId;
     }
     $pdo->prepare($sql)->execute($params);
 }
@@ -597,6 +623,10 @@ function effective_attendance_sql() {
                 AND (st0.counted_months IS NULL
                      OR st0.counted_months = ''
                      OR FIND_IN_SET(CAST(DATE_FORMAT(dd0.duty_date, '%Y-%m') AS BINARY), CAST(REPLACE(st0.counted_months, ' ', '') AS BINARY)) > 0)
+                AND (st0.follow_staff_id IS NULL
+                     OR EXISTS (SELECT 1 FROM duty_attendance daf0
+                                JOIN duty_days ddf0 ON ddf0.id = daf0.duty_day_id
+                                WHERE daf0.staff_id = st0.follow_staff_id AND ddf0.duty_date = dd0.duty_date))
                )
             UNION
             SELECT dd2.id AS duty_day_id, hs.id AS staff_id
@@ -609,7 +639,11 @@ function effective_attendance_sql() {
                    OR FIND_IN_SET(CAST(DAYOFWEEK(dd2.duty_date) - 1 AS BINARY), CAST(REPLACE(hs.excluded_days, ' ', '') AS BINARY)) = 0)
               AND (hs.counted_months IS NULL
                    OR hs.counted_months = ''
-                   OR FIND_IN_SET(CAST(DATE_FORMAT(dd2.duty_date, '%Y-%m') AS BINARY), CAST(REPLACE(hs.counted_months, ' ', '') AS BINARY)) > 0)";
+                   OR FIND_IN_SET(CAST(DATE_FORMAT(dd2.duty_date, '%Y-%m') AS BINARY), CAST(REPLACE(hs.counted_months, ' ', '') AS BINARY)) > 0)
+              AND (hs.follow_staff_id IS NULL
+                   OR EXISTS (SELECT 1 FROM duty_attendance daf2
+                              JOIN duty_days ddf2 ON ddf2.id = daf2.duty_day_id
+                              WHERE daf2.staff_id = hs.follow_staff_id AND ddf2.duty_date = dd2.duty_date))";
 }
 
 function staff_total_sc($pdo, $staffId, $startDate, $endDate, $branchId = null, $shift = null) {
@@ -674,7 +708,7 @@ function period_overcost($budget, $grossTotal, $overcostTotal) {
     $budget        = (float)$budget;
     $grossTotal    = (float)$grossTotal;
     $overcostTotal = (float)$overcostTotal;
-    $rate          = $budget > 0 ? $grossTotal / $budget : 0.0;
+    $rate          = $grossTotal > 0 ? $budget / $grossTotal : 0.0;
     $nextRate      = $overcostTotal > 0 ? $grossTotal / $overcostTotal : 0.0;
     return [
         'budget'        => $budget,
@@ -789,7 +823,7 @@ function period_summary($pdo, $periodId, $shift = null) {
     $budgetRow = $pdo->prepare('SELECT budget FROM period_budgets WHERE period_id = ?');
     $budgetRow->execute([$period['id']]);
     $budget = (float)($budgetRow->fetchColumn() ?: 0);
-    $rate = $budget > 0 ? $grossTotal / $budget : 0.0;
+    $rate = $grossTotal > 0 ? $budget / $grossTotal : 0.0;
 
     $overcostTotalTemp = 0.0;
     foreach ($staffData as &$sd) {

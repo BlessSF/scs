@@ -7,7 +7,7 @@ require_role(['admin', 'cashier']);
 $id = isset($_GET['id']) ? (int)$_GET['id'] : (isset($_POST['id']) ? (int)$_POST['id'] : 0);
 $branches = visible_branches(false);
 $defaultBranchId = scoped_branch_id($_GET['branch_id'] ?? ($branches[0]['id'] ?? 1));
-$staff = ['branch_id' => $defaultBranchId, 'full_name' => '', 'status' => 'regular', 'remarks' => '', 'date_added' => date('Y-m-d'), 'is_active' => 1, 'is_hidden' => 0, 'excluded_days' => '', 'counted_months' => ''];
+$staff = ['branch_id' => $defaultBranchId, 'full_name' => '', 'status' => 'regular', 'remarks' => '', 'date_added' => date('Y-m-d'), 'is_active' => 1, 'is_hidden' => 0, 'excluded_days' => '', 'counted_months' => '', 'follow_staff_id' => null];
 $account = ['username' => ''];
 
 if ($id) {
@@ -51,6 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         ksort($cmList);
         $staff['counted_months'] = implode(',', $cmList);
+
+        // Optional: only count this owner on the dates a chosen staff member worked.
+        $fid = (int)($_POST['follow_staff_id'] ?? 0);
+        $staff['follow_staff_id'] = ($fid > 0 && $fid !== (int)$id) ? $fid : null;
     }
     $extraBranchIds = array_map('intval', $_POST['extra_branch_ids'] ?? []);
 
@@ -66,11 +70,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         if ($id) {
-            $stmt = $pdo->prepare('UPDATE staff SET branch_id=?, full_name=?, status=?, remarks=?, date_added=?, is_active=?, is_hidden=?, excluded_days=?, counted_months=? WHERE id=?');
-            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months'], $id]);
+            $stmt = $pdo->prepare('UPDATE staff SET branch_id=?, full_name=?, status=?, remarks=?, date_added=?, is_active=?, is_hidden=?, excluded_days=?, counted_months=?, follow_staff_id=? WHERE id=?');
+            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months'], $staff['follow_staff_id'], $id]);
         } else {
-            $stmt = $pdo->prepare('INSERT INTO staff (branch_id, full_name, status, remarks, date_added, is_active, is_hidden, excluded_days, counted_months) VALUES (?,?,?,?,?,?,?,?,?)');
-            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months']]);
+            $stmt = $pdo->prepare('INSERT INTO staff (branch_id, full_name, status, remarks, date_added, is_active, is_hidden, excluded_days, counted_months, follow_staff_id) VALUES (?,?,?,?,?,?,?,?,?,?)');
+            $stmt->execute([$staff['branch_id'], $staff['full_name'], $staff['status'], $staff['remarks'], $staff['date_added'], $staff['is_active'], $staff['is_hidden'], $staff['excluded_days'], $staff['counted_months'], $staff['follow_staff_id']]);
             $id = (int)$pdo->lastInsertId();
         }
 
@@ -308,6 +312,22 @@ require __DIR__ . '/../includes/header.php';
                 <?php endforeach; ?>
             </div>
             <p class="small" style="color:var(--muted); margin-top:6px;">Leave all unchecked to count this owner in every month. Example: check Aug and Sep so a Jul&ndash;Sep period only counts her for those two months.</p>
+
+            <?php
+                $followCandidates = $pdo->query("SELECT s.id, s.full_name, b.name AS branch_name
+                    FROM staff s JOIN branches b ON b.id = s.branch_id
+                    WHERE s.is_hidden = 0 AND s.is_active = 1 ORDER BY b.name, s.full_name")->fetchAll();
+            ?>
+            <label for="follow_staff_id" style="margin:14px 0 6px; display:block;">Count Only on the Same Days As <span style="font-weight:400; color:var(--muted);">(optional)</span></label>
+            <select name="follow_staff_id" id="follow_staff_id" style="max-width:420px;">
+                <option value="">— Normal (count every day) —</option>
+                <?php foreach ($followCandidates as $fc): ?>
+                    <option value="<?= (int)$fc['id'] ?>" <?= (int)($staff['follow_staff_id'] ?? 0) === (int)$fc['id'] ? 'selected' : '' ?>>
+                        <?= h($fc['full_name']) ?> (<?= h($fc['branch_name']) ?>)
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <p class="small" style="color:var(--muted); margin-top:6px;">If chosen, this owner is counted only on the dates that staff member was on duty, so their days always match.</p>
         </div>
         <script>
         (function(){

@@ -72,7 +72,7 @@ require __DIR__ . '/../includes/header.php';
                 <button type="submit" class="btn">Save</button>
             </form>
         </div>
-        <div class="stat-card"><div class="stat-value"><?= number_format($overcost['rate'], 8) ?></div><div class="stat-label">Overcost Rate (Gross ÷ Budget)</div></div>
+        <div class="stat-card"><div class="stat-value"><?= number_format($overcost['rate'], 8) ?></div><div class="stat-label">Overcost Rate (Budget ÷ Gross)</div></div>
         <div class="stat-card"><div class="stat-value"><?= money($overcost['actual']) ?></div><div class="stat-label">Total Gross (all staff)</div></div>
         <div class="stat-card"><div class="stat-value"><?= money($overcost['overcost']) ?></div><div class="stat-label">Total Overcost (all staff)</div></div>
     </div>
@@ -86,17 +86,17 @@ require __DIR__ . '/../includes/header.php';
     <div>
     <table style="width:100%; table-layout:fixed; font-size:0.75rem; border-collapse:collapse;">
         <colgroup>
-            <col style="width:13%"><!-- Name -->
-            <col style="width:8%"> <!-- Status -->
+            <col style="width:18%"><!-- Name -->
+            <col style="width:12%"> <!-- Status -->
             <col style="width:5%"> <!-- Reg Days -->
             <col style="width:8%"> <!-- Reg SC -->
-            <col style="width:5%"> <!-- Bar Days -->
-            <col style="width:8%"> <!-- Bar SC -->
+            <col style="width:4%"> <!-- Bar Days -->
+            <col style="width:7%"> <!-- Bar SC -->
             <col style="width:8%"> <!-- Total SC -->
             <col style="width:7%"> <!-- Mgmt% -->
             <col style="width:8%"> <!-- Gross -->
-            <col style="width:6%"> <!-- Dmg -->
-            <col style="width:7%"> <!-- Cash Adv -->
+            <col style="width:5%"> <!-- Dmg -->
+            <col style="width:5%"> <!-- Cash Adv -->
             <col style="width:7%"> <!-- Overcost -->
             <col style="width:8%"> <!-- Net -->
             <col style="width:6%"> <!-- Actions -->
@@ -122,8 +122,8 @@ require __DIR__ . '/../includes/header.php';
         <tbody>
         <?php foreach ($rows as $r): ?>
             <tr>
-                <td style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<?= h($r['full_name']) ?>"><?= h($r['full_name']) ?><?php if (!empty($r['is_hidden'])): ?> <span class="badge badge-regular" title="Owner / Admin, from the Shared branch">Shared</span><?php endif; ?></td>
-                <td><span class="badge badge-<?= h($r['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$r['status']))) ?></span></td>
+                <td style="white-space:normal; word-break:break-word; line-height:1.3;" title="<?= h($r['full_name']) ?>"><?= h($r['full_name']) ?><?php if (!empty($r['is_hidden'])): ?> <span class="badge badge-regular" title="Owner / Admin, from the Shared branch">Shared</span><?php endif; ?></td>
+                <td style="white-space:nowrap; padding-right:14px;"><span class="badge badge-<?= h($r['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$r['status']))) ?></span></td>
                 <td class="text-right" style="white-space:nowrap;"><?= (int)$r['regular_days'] ?></td>
                 <td class="text-right" style="white-space:nowrap;"><?= money($r['regular_sc']) ?></td>
                 <td class="text-right" style="white-space:nowrap;"><?= (int)$r['bar_night_days'] ?></td>

@@ -1097,3 +1097,19 @@ td .btn-sm + .btn-sm, td form + .btn-sm, td .btn-sm + form { margin-left: 4px; }
 @media (max-width: 900px) {
     .sticky-save-bar { margin: 20px -16px 0; padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
 }
+/* =====================================================================
+   Top bar: keep everything on ONE line on desktop (the extra "Daily
+   Summary" link made the bar wrap onto a second row at 100% zoom).
+   ===================================================================== */
+@media (min-width: 769px) {
+    .topbar-inner { max-width: 1600px; flex-wrap: nowrap; gap: 14px; padding: 10px 18px; }
+    .brand { white-space: nowrap; flex-shrink: 0; font-size: 1.05rem; }
+    .main-nav { flex-wrap: nowrap; flex: 1 1 auto; min-width: 0; justify-content: center; }
+    .main-nav a { white-space: nowrap; font-size: .82rem; padding: 6px 9px; margin-right: 2px; }
+    .user-menu-desktop { flex-shrink: 0; white-space: nowrap; font-size: .8rem; gap: 8px; }
+}
+/* Medium screens: tighten a little more so nothing is pushed out */
+@media (min-width: 769px) and (max-width: 1250px) {
+    .main-nav a { font-size: .78rem; padding: 6px 7px; }
+    .user-menu-desktop span { max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+}
