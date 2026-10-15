@@ -554,16 +554,15 @@ function staff_visiting_candidates($branchId) {
 
 /**
  * Which of THIS branch's own staff are already on duty at a DIFFERENT branch
- * on the same date and shift? Used on the duty entry page to flag
+ * on the same date? Used on the duty entry page to flag
  * "At Hero today" next to a staff member's name and to pre-tick them, so a
  * staff member sent elsewhere is still credited at their home branch.
  *
  * @param int    $branchId
  * @param string $date   Y-m-d
- * @param string $shift  'regular' | 'bar_night'
  * @return array<int,string>  staff_id => "Hero, H Bar" (names of the other branches)
  */
-function staff_on_duty_elsewhere($branchId, $date, $shift) {
+function staff_on_duty_elsewhere($branchId, $date) {
     global $pdo;
     $stmt = $pdo->prepare(
         "SELECT da.staff_id, GROUP_CONCAT(DISTINCT b.name ORDER BY b.name SEPARATOR ', ') AS at_branches
@@ -571,12 +570,12 @@ function staff_on_duty_elsewhere($branchId, $date, $shift) {
          JOIN duty_days dd ON dd.id = da.duty_day_id
          JOIN branches b   ON b.id = dd.branch_id
          JOIN staff s      ON s.id = da.staff_id
-         WHERE dd.duty_date = ? AND dd.shift = ? AND dd.branch_id <> ?
+         WHERE dd.duty_date = ? AND dd.branch_id <> ?
            AND s.is_hidden = 0
            AND (s.branch_id = ? OR EXISTS (SELECT 1 FROM staff_branches sb WHERE sb.staff_id = s.id AND sb.branch_id = ?))
          GROUP BY da.staff_id"
     );
-    $stmt->execute([$date, $shift, $branchId, $branchId, $branchId]);
+    $stmt->execute([$date, $branchId, $branchId, $branchId]);
     $map = [];
     foreach ($stmt->fetchAll() as $r) { $map[(int)$r['staff_id']] = $r['at_branches']; }
     return $map;
@@ -646,7 +645,7 @@ function effective_attendance_sql() {
                               WHERE daf2.staff_id = hs.follow_staff_id AND ddf2.duty_date = dd2.duty_date))";
 }
 
-function staff_total_sc($pdo, $staffId, $startDate, $endDate, $branchId = null, $shift = null) {
+function staff_total_sc($pdo, $staffId, $startDate, $endDate, $branchId = null) {
     $eff = effective_attendance_sql();
     $sql = "SELECT dd.duty_date, dd.total_amount, cnt.staff_count
             FROM ($eff) da
@@ -657,11 +656,10 @@ function staff_total_sc($pdo, $staffId, $startDate, $endDate, $branchId = null, 
                 GROUP BY duty_day_id
             ) cnt ON cnt.duty_day_id = dd.id
             WHERE da.staff_id = ?
-              AND dd.duty_date BETWEEN ? AND ?" . ($branchId ? " AND dd.branch_id = ?" : "") . ($shift ? " AND dd.shift = ?" : "");
+              AND dd.duty_date BETWEEN ? AND ?" . ($branchId ? " AND dd.branch_id = ?" : "");
     $stmt = $pdo->prepare($sql);
     $params = [$staffId, $startDate, $endDate];
     if ($branchId) $params[] = $branchId;
-    if ($shift) $params[] = $shift;
     $stmt->execute($params);
 
     $total = 0.0;
@@ -728,18 +726,16 @@ function period_overcost($budget, $grossTotal, $overcostTotal) {
  * @param int $periodId
  * @return array{period: array, rows: array, totals: array}|null
  */
-function period_summary($pdo, $periodId, $shift = null) {
+function period_summary($pdo, $periodId) {
     $stmt = $pdo->prepare('SELECT * FROM periods WHERE id = ?');
     $stmt->execute([$periodId]);
     $period = $stmt->fetch();
     if (!$period) return null;
 
     // Staff of this period's branch who worked in this range OR already have a deduction row recorded.
-    // When a shift filter is active, only staff with duty days on that shift are listed
-    // (deduction-only rows are still included so nothing gets silently dropped).
     $dutySql = "SELECT da.staff_id FROM duty_attendance da
                 JOIN duty_days dd ON dd.id = da.duty_day_id
-                WHERE dd.duty_date BETWEEN ? AND ? AND dd.branch_id = ?" . ($shift ? " AND dd.shift = ?" : "");
+                WHERE dd.duty_date BETWEEN ? AND ? AND dd.branch_id = ?";
     // All staff (including hidden) for SC total calculations.
     // Hidden staff (owners / other admins, typically homed in the "Shared"
     // branch) are auto-added to EVERY branch's duty days regardless of their
@@ -778,13 +774,11 @@ function period_summary($pdo, $periodId, $shift = null) {
             ORDER BY s.full_name";
     $stmt = $pdo->prepare($sql);
     $params = [$period['branch_id'], $period['start_date'], $period['end_date'], $period['branch_id']];
-    if ($shift) $params[] = $shift;
     $params[] = $periodId;
     $params[] = $period['branch_id']; // hidden staff: home branch match
     $params[] = $period['branch_id']; // hidden staff: staff_branches match
     $params[] = $period['branch_id']; // visiting staff: home branch is NOT this branch
     $params[] = $period['start_date']; $params[] = $period['end_date']; $params[] = $period['branch_id'];
-    if ($shift) $params[] = $shift;
     $stmt->execute($params);
     $allStaffList  = $stmt->fetchAll();
 
@@ -802,20 +796,14 @@ function period_summary($pdo, $periodId, $shift = null) {
     $staffData = [];
     $grossTotal = 0.0;
     foreach ($allStaffList as $s) {
-        $sc = staff_total_sc($pdo, $s['id'], $period['start_date'], $period['end_date'], $period['branch_id'], $shift);
+        $sc = staff_total_sc($pdo, $s['id'], $period['start_date'], $period['end_date'], $period['branch_id']);
         $totalSc = $sc['total'];
         $mgmtShare = $totalSc * ((float)$period['management_share_percent'] / 100);
         $gross = $totalSc - $mgmtShare;
         $grossTotal += $gross;
 
-        // Per-shift breakdown, always computed regardless of the active $shift filter,
-        // so slips can show Regular Day SC / Bar Night SC / combined Total SC side by side.
-        $scRegular  = staff_total_sc($pdo, $s['id'], $period['start_date'], $period['end_date'], $period['branch_id'], 'regular');
-        $scBarNight = staff_total_sc($pdo, $s['id'], $period['start_date'], $period['end_date'], $period['branch_id'], 'bar_night');
-
         $staffData[] = [
             's' => $s, 'sc' => $sc, 'totalSc' => $totalSc, 'mgmtShare' => $mgmtShare, 'gross' => $gross,
-            'scRegular' => $scRegular, 'scBarNight' => $scBarNight,
         ];
     }
 
@@ -849,8 +837,6 @@ function period_summary($pdo, $periodId, $shift = null) {
         $mgmtShare = $sd['mgmtShare'];
         $gross = $sd['gross'];
         $sc = $sd['sc'];
-        $scRegular = $sd['scRegular'];
-        $scBarNight = $sd['scBarNight'];
 
         $d = $deductionsByStaff[$s['id']] ?? ['damages_charges' => 0, 'cash_advance' => 0, 'overcost_cogs' => 0, 'remarks' => '', 'received_by' => ''];
         $overcostCogs = $sd['overcostCogs'];
@@ -877,11 +863,6 @@ function period_summary($pdo, $periodId, $shift = null) {
             'received_by'      => $d['received_by'] ?? '',
             'net'              => $net,
             'days_worked'      => count($sc['days']),
-            'regular_sc'          => $scRegular['total'],
-            'regular_days'        => count($scRegular['days']),
-            'bar_night_sc'        => $scBarNight['total'],
-            'bar_night_days'      => count($scBarNight['days']),
-            'combined_total_sc'   => $scRegular['total'] + $scBarNight['total'],
         ];
 
         $totals['total_sc']         += $totalSc;
@@ -893,7 +874,7 @@ function period_summary($pdo, $periodId, $shift = null) {
         $totals['net']              += $net;
     }
 
-    return ['period' => $period, 'rows' => $rows, 'totals' => $totals, 'shift' => $shift, 'overcost' => $periodOvercost];
+    return ['period' => $period, 'rows' => $rows, 'totals' => $totals, 'overcost' => $periodOvercost];
 }
 
 /**
@@ -904,8 +885,8 @@ function period_summary($pdo, $periodId, $shift = null) {
  * @param int $staffId
  * @return array{period: array, row: array}|null
  */
-function staff_period_slip($pdo, $periodId, $staffId, $shift = null) {
-    $summary = period_summary($pdo, $periodId, $shift);
+function staff_period_slip($pdo, $periodId, $staffId) {
+    $summary = period_summary($pdo, $periodId);
     if (!$summary) return null;
     foreach ($summary['rows'] as $row) {
         if ($row['staff_id'] == $staffId) {

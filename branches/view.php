@@ -24,10 +24,6 @@ $stmt = $pdo->prepare('SELECT COALESCE(SUM(total_amount),0) FROM duty_days WHERE
 $stmt->execute([$branchId, $today]);
 $todayTotal = (float)$stmt->fetchColumn();
 
-$stmt = $pdo->prepare("SELECT COALESCE(SUM(total_amount),0) FROM duty_days WHERE branch_id = ? AND duty_date = ? AND shift = 'bar_night'");
-$stmt->execute([$branchId, $today]);
-$todayBarNight = (float)$stmt->fetchColumn();
-
 $stmt = $pdo->prepare('SELECT COALESCE(SUM(total_amount),0) FROM duty_days WHERE branch_id = ? AND duty_date BETWEEN ? AND ?');
 $stmt->execute([$branchId, $thisMonthStart, $thisMonthEnd]);
 $monthTotal = (float)$stmt->fetchColumn();
@@ -80,9 +76,6 @@ require __DIR__ . '/../includes/header.php';
         <div class="stat-icon">🗓️</div>
         <div class="stat-value"><?= money($todayTotal) ?></div>
         <div class="stat-label">Gross SC — Today</div>
-        <?php if ($todayBarNight > 0): ?>
-            <div class="small muted" style="margin-top:4px;">🌙 Bar Night: <?= money($todayBarNight) ?></div>
-        <?php endif; ?>
     </div>
     <?php endif; ?>
     <?php if (!$isCashier): ?>

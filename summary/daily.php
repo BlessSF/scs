@@ -29,29 +29,18 @@ if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) $from = date('Y-m-01');
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $to))   $to   = date('Y-m-t');
 if ($to < $from) { $tmp = $from; $from = $to; $to = $tmp; }
 
-// Total service charge per branch per day (regular + bar night added together).
+// Total service charge per branch per day.
 $stmt = $pdo->prepare(
-    "SELECT dd.duty_date, dd.branch_id,
-            SUM(dd.total_amount) AS total_amount,
-            SUM(CASE WHEN dd.shift = 'regular'   THEN dd.total_amount ELSE 0 END) AS regular_amount,
-            SUM(CASE WHEN dd.shift = 'bar_night' THEN dd.total_amount ELSE 0 END) AS bar_amount
+    "SELECT dd.duty_date, dd.branch_id, SUM(dd.total_amount) AS total_amount
      FROM duty_days dd
      WHERE dd.duty_date BETWEEN ? AND ?
      GROUP BY dd.duty_date, dd.branch_id"
 );
 $stmt->execute([$from, $to]);
 
-$byDay = [];          // [date][branch_id] => regular amount
-$barByDay = [];       // [date][branch_id] => bar night amount
-$branchesUsed = [];   // branch ids that have at least one entry in range
+$byDay = [];          // [date][branch_id] => amount
 foreach ($stmt->fetchAll() as $r) {
-    $d = $r['duty_date']; $bid = (int)$r['branch_id'];
-    $reg = (float)$r['regular_amount']; $bar = (float)$r['bar_amount'];
-    if (!isset($byDay[$d])) $byDay[$d] = [];
-    // a day that only has a bar-night entry still needs a row
-    if ($reg != 0 || $bar == 0 || !isset($r['bar_amount'])) $byDay[$d][$bid] = $reg;
-    if ($bar != 0) $barByDay[$d][$bid] = $bar;
-    $branchesUsed[$bid] = true;
+    $byDay[$r['duty_date']][(int)$r['branch_id']] = (float)$r['total_amount'];
 }
 
 // Branch columns: every branch that has EVER recorded a duty day (so a branch
@@ -62,23 +51,13 @@ $branches = array_values(array_filter(get_branches(false), function ($b) use ($e
     return in_array((int)$b['id'], $everUsed, true);
 }));
 
-// Branches that have EVER had a bar-night entry get their own extra column.
-$barBranchIds = array_map('intval', $pdo->query("SELECT DISTINCT branch_id FROM duty_days WHERE shift = 'bar_night'")->fetchAll(PDO::FETCH_COLUMN));
-
-// Make sure a day with only a bar-night entry still appears.
-foreach ($barByDay as $d => $x) { if (!isset($byDay[$d])) $byDay[$d] = []; }
 krsort($byDay); // newest day first
 
 $colTotals = [];
-$barTotals = [];
 $grand = 0.0;
 foreach ($byDay as $date => $perBranch) {
     foreach ($perBranch as $bid => $amt) {
         $colTotals[$bid] = ($colTotals[$bid] ?? 0) + $amt;
-        $grand += $amt;
-    }
-    foreach (($barByDay[$date] ?? []) as $bid => $amt) {
-        $barTotals[$bid] = ($barTotals[$bid] ?? 0) + $amt;
         $grand += $amt;
     }
 }
@@ -89,7 +68,7 @@ require __DIR__ . '/../includes/header.php';
 <div class="page-head">
     <h1>Daily Summary</h1>
 </div>
-<p class="muted">Total service charge recorded each day, per branch (bar night shown in its own column; the Total adds everything).</p>
+<p class="muted">Total service charge recorded each day, per branch.</p>
 
 <form method="get" class="card" style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:16px;">
     <?php
@@ -127,9 +106,6 @@ require __DIR__ . '/../includes/header.php';
                     <th>Day</th>
                     <?php foreach ($branches as $b): ?>
                         <th style="text-align:right;"><?= h($b['name']) ?></th>
-                        <?php if (in_array((int)$b['id'], $barBranchIds, true)): ?>
-                            <th style="text-align:right;">Bar Night</th>
-                        <?php endif; ?>
                     <?php endforeach; ?>
                     <th style="text-align:right;">Total (All Branches)</th>
                 </tr>
@@ -141,11 +117,8 @@ require __DIR__ . '/../includes/header.php';
                     <td><?= h(date('D', strtotime($date))) ?></td>
                     <?php foreach ($branches as $b): $bid = (int)$b['id']; $amt = $perBranch[$bid] ?? null; ?>
                         <td style="text-align:right;"><?= $amt === null ? '—' : money($amt) ?></td>
-                        <?php if (in_array($bid, $barBranchIds, true)): $bamt = $barByDay[$date][$bid] ?? null; ?>
-                            <td style="text-align:right;"><?= $bamt === null ? '—' : money($bamt) ?></td>
-                        <?php endif; ?>
                     <?php endforeach; ?>
-                    <td style="text-align:right;"><strong><?= money(array_sum($perBranch) + array_sum($barByDay[$date] ?? [])) ?></strong></td>
+                    <td style="text-align:right;"><strong><?= money(array_sum($perBranch)) ?></strong></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
@@ -154,9 +127,6 @@ require __DIR__ . '/../includes/header.php';
                     <th colspan="2">TOTAL</th>
                     <?php foreach ($branches as $b): ?>
                         <th style="text-align:right;"><?= money($colTotals[(int)$b['id']] ?? 0) ?></th>
-                        <?php if (in_array((int)$b['id'], $barBranchIds, true)): ?>
-                            <th style="text-align:right;"><?= money($barTotals[(int)$b['id']] ?? 0) ?></th>
-                        <?php endif; ?>
                     <?php endforeach; ?>
                     <th style="text-align:right;"><?= money($grand) ?></th>
                 </tr>

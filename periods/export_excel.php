@@ -5,9 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $id = (int)($_GET['id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
-$summary = period_summary($pdo, $id, $shift);
+$summary = period_summary($pdo, $id);
 if (!$summary) {
     flash('error', 'Period not found.');
     redirect('/periods/list.php');
@@ -58,7 +56,6 @@ function xcell($val) { return h($val); }
             <?= xcell(date('M j, Y', strtotime($period['start_date'])) . ' - ' . date('M j, Y', strtotime($period['end_date']))) ?>
             &nbsp;&middot;&nbsp; Management share: <?= xcell($period['management_share_percent']) ?>%
             &nbsp;&middot;&nbsp; Status: <?= xcell(ucfirst($period['status'])) ?>
-            &nbsp;&middot;&nbsp; Filter: <?= xcell($shift ? ($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only') : 'All sales') ?>
         </td>
     </tr>
     <tr><td colspan="10"></td></tr>

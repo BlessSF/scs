@@ -5,9 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $id = (int)($_GET['id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
-$summary = period_summary($pdo, $id, $shift);
+$summary = period_summary($pdo, $id);
 if (!$summary) {
     flash('error', 'Period not found.');
     redirect('/periods/list.php');
@@ -91,7 +89,7 @@ $company = get_setting('company_name', APP_NAME);
 <body>
     <div class="print-toolbar">
         <button class="go" onclick="window.print()">🖨️ Print / Save as PDF</button>
-        <a class="back" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $shift ? '&shift='.urlencode($shift) : '' ?>">← Back</a>
+        <a class="back" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?>">← Back</a>
     </div>
 
     <div class="sheet">
@@ -102,9 +100,6 @@ $company = get_setting('company_name', APP_NAME);
                 <?= h(date('M j, Y', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?>
                 &middot; Management share: <?= h($period['management_share_percent']) ?>%
                 <span class="status-chip"><?= h(ucfirst($period['status'])) ?></span>
-                <?php if ($shift): ?>
-                <span class="status-chip"><?= h($shift === 'bar_night' ? '🌙 Bar Night only' : '☀️ Regular day only') ?></span>
-                <?php endif; ?>
             </div>
         </div>
 

@@ -22,14 +22,10 @@ $firstOfMonth = sprintf('%04d-%02d-01', $year, $month);
 $daysInMonth  = (int)date('t', strtotime($firstOfMonth));
 $startWeekday = (int)date('w', strtotime($firstOfMonth)); // 0 = Sun
 
-// Pull recorded duty days for this month, this branch. A day can now have
-// both a 'regular' row and a 'bar_night' row (Fri/Sat) -- keep them broken if 
-// out separately so the calendar cell can show each on its own line.
+// Pull recorded duty days for this month, this branch.
 $stmt = $pdo->prepare("SELECT dd.duty_date,
-                               SUM(CASE WHEN dd.shift = 'regular'   THEN dd.total_amount ELSE 0 END) AS regular_amount,
-                               SUM(CASE WHEN dd.shift = 'bar_night' THEN dd.total_amount ELSE 0 END) AS bar_night_amount,
-                               SUM(CASE WHEN dd.shift = 'regular'   THEN COALESCE(ac.staff_count, 0) ELSE 0 END) AS regular_staff_count,
-                               SUM(CASE WHEN dd.shift = 'bar_night' THEN COALESCE(ac.staff_count, 0) ELSE 0 END) AS bar_night_staff_count
+                               SUM(dd.total_amount) AS regular_amount,
+                               SUM(COALESCE(ac.staff_count, 0)) AS regular_staff_count
                         FROM duty_days dd
                         LEFT JOIN (
                             SELECT da.duty_day_id, COUNT(DISTINCT da.staff_id) AS staff_count
@@ -79,12 +75,6 @@ require __DIR__ . '/../includes/header.php';
         <a class="btn btn-sm btn-secondary" href="?branch_id=<?= $branchId ?>&month=<?= $nextMonth ?>&year=<?= $nextYear ?>">Next &rarr;</a>
     </div>
 
-    <div class="day-mode-toggle" id="dayModeToggle" data-branch="<?= $branchId ?>">
-        <button type="button" class="btn-mode is-active" id="modeRegularBtn" data-mode="regular">Regular Day</button>
-        <button type="button" class="btn-mode" id="modeBarNightBtn" data-mode="bar_night">🌙 Activate Bar Night</button>
-    </div>
-    <p class="small muted" id="dayModeHint" style="margin:6px 0 0;">Regular Day — every day of the week is open for entry.</p>
-
     <div class="day-grid" id="dutyDayGrid" style="margin-top:18px;">
         <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $wd): ?>
             <div class="small muted" style="text-align:center;font-weight:700;"><?= $wd ?></div>
@@ -101,12 +91,7 @@ require __DIR__ . '/../includes/header.php';
         ?>
             <a class="day-cell" data-dow="<?= $dow ?>" href="<?= BASE_URL ?>/duty/day.php?date=<?= $dateStr ?>&branch_id=<?= $branchId ?>">
                 <span class="d-num"><?= $d ?></span>
-                <?php if ($rec && (float)$rec['bar_night_amount'] > 0): ?>
-                    <span class="d-amt"><?= money($rec['regular_amount']) ?></span>
-                    <?php if (is_admin()): ?><span class="small muted"><?= (int)$rec['regular_staff_count'] ?> staff</span><?php endif; ?>
-                    <span class="d-amt d-amt-bar">🌙 <?= money($rec['bar_night_amount']) ?></span>
-                    <?php if (is_admin()): ?><span class="small muted"><?= (int)$rec['bar_night_staff_count'] ?> staff</span><?php endif; ?>
-                <?php elseif ($rec): ?>
+                <?php if ($rec): ?>
                     <span class="d-amt"><?= money($rec['regular_amount']) ?></span>
                     <?php if (is_admin()): ?><span class="small muted"><?= (int)$rec['regular_staff_count'] ?> staff</span><?php endif; ?>
                 <?php else: ?>
@@ -116,36 +101,4 @@ require __DIR__ . '/../includes/header.php';
         <?php endfor; ?>
     </div>
 </div>
-<script>
-(function () {
-    var wrap = document.getElementById('dayModeToggle');
-    var grid = document.getElementById('dutyDayGrid');
-    var hint = document.getElementById('dayModeHint');
-    var regularBtn = document.getElementById('modeRegularBtn');
-    var barNightBtn = document.getElementById('modeBarNightBtn');
-    if (!wrap || !grid) return;
-
-    var storageKey = 'dutyDayMode_branch_' + wrap.getAttribute('data-branch');
-
-    function applyMode(mode, save) {
-        var isBarNight = mode === 'bar_night';
-        grid.classList.toggle('mode-bar-night', isBarNight);
-        regularBtn.classList.toggle('is-active', !isBarNight);
-        barNightBtn.classList.toggle('is-active', isBarNight);
-        hint.textContent = isBarNight
-            ? 'Bar Night — only Friday and Saturday are open for entry; Sunday–Thursday are locked.'
-            : 'Regular Day — every day of the week is open for entry.';
-        if (save) {
-            try { localStorage.setItem(storageKey, mode); } catch (e) {}
-        }
-    }
-
-    regularBtn.addEventListener('click', function () { applyMode('regular', true); });
-    barNightBtn.addEventListener('click', function () { applyMode('bar_night', true); });
-
-    var saved = 'regular';
-    try { saved = localStorage.getItem(storageKey) || 'regular'; } catch (e) {}
-    applyMode(saved, false);
-})();
-</script>
 <?php require __DIR__ . '/../includes/footer.php'; ?>

@@ -5,9 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $id = (int)($_GET['id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
-$summary = period_summary($pdo, $id, $shift);
+$summary = period_summary($pdo, $id);
 if (!$summary) {
     flash('error', 'Period not found.');
     redirect('/periods/list.php');
@@ -104,14 +102,13 @@ require __DIR__ . '/../includes/header.php';
 <div class="no-print">
     <div class="actions">
         <button class="btn" onclick="window.print()">🖨 Print All Slips</button>
-        <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $shift ? '&shift='.urlencode($shift) : '' ?><?= $st !== '' ? '&st='.urlencode($st) : '' ?>">Back to Period</a>
+        <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?><?= $st !== '' ? '&st='.urlencode($st) : '' ?>">Back to Period</a>
     </div>
 
     <h1><?= h($branch['name'] ?? '') ?> — <?= h($period['name']) ?></h1>
     <p class="subtitle">
         <?= count($rows) ?> slip<?= count($rows) === 1 ? '' : 's' ?> on
         <?= $sheetCount ?> sheet<?= $sheetCount === 1 ? '' : 's' ?> of bond paper (6 slips per sheet).
-        <?php if ($shift): ?> Filtered: <?= h($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only') ?><?php endif; ?>
         <?php if ($st !== ''): ?> Printing <strong><?= h($STATUS_LABELS[$st]) ?></strong> only (<?= count($rows) ?> of <?= $allCount ?> staff).<?php endif; ?>
     </p>
 
@@ -119,7 +116,7 @@ require __DIR__ . '/../includes/header.php';
         <div>
             <label for="ppStatus">Print</label>
             <select id="ppStatus" onchange="location.href=this.value">
-                <?php $stBase = BASE_URL . '/periods/print_all_slips.php?id=' . $period['id'] . ($shift ? '&shift=' . urlencode($shift) : ''); ?>
+                <?php $stBase = BASE_URL . '/periods/print_all_slips.php?id=' . $period['id']; ?>
                 <option value="<?= h($stBase) ?>"<?= $st === '' ? ' selected' : '' ?>>All staff (<?= $allCount ?>)</option>
                 <?php foreach ($STATUS_LABELS as $k => $lbl): ?>
                 <option value="<?= h($stBase . '&st=' . $k) ?>"<?= $st === $k ? ' selected' : '' ?>><?= h($lbl) ?> only (<?= $statusCounts[$k] ?>)</option>

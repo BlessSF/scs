@@ -772,67 +772,7 @@ input[type=checkbox], input[type=radio] { width: 18px; height: 18px; cursor: poi
 .day-cell .d-amt-bar { color: var(--accent); margin-top: 6px; }
 .day-cell.empty { visibility: hidden; }
 
-/* Regular / Bar Night side-by-side entry panels (duty/day.php, Fri & Sat only) */
-.shift-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
 .shift-panel { border-left: 4px solid var(--primary); }
-.shift-panel-bar_night { border-left-color: var(--accent); }
-.shift-panel-title { margin: 0 0 16px; font-size: 1.05rem; }
-.shift-panel-bar_night .shift-panel-title { color: var(--accent); }
-@media (max-width: 860px) {
-    .shift-grid { grid-template-columns: 1fr; }
-}
-
-
-/* Regular Day / Bar Night toggle */
-.day-mode-toggle { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
-.btn-mode {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: var(--surface);
-    color: var(--text-muted);
-    border: 1.5px solid var(--border-strong);
-    padding: 8px 16px;
-    border-radius: 999px;
-    cursor: pointer;
-    font-size: .85rem;
-    font-weight: 700;
-    transition: all .15s ease;
-}
-.btn-mode:hover { border-color: var(--primary); color: var(--text); }
-.btn-mode.is-active {
-    color: #fff;
-    border-color: transparent;
-    background: linear-gradient(135deg, var(--primary-light), var(--primary));
-    box-shadow: 0 3px 10px rgba(20, 108, 91, .28);
-}
-.btn-mode[data-mode="bar_night"].is-active {
-    background: linear-gradient(135deg, var(--accent-light), var(--accent));
-    box-shadow: 0 3px 12px rgba(224, 138, 30, .38);
-}
-
-/* Bar Night mode: only Fri/Sat are enterable, rest of the week is locked */
-.day-grid.mode-bar-night .day-cell:not(.empty) {
-    opacity: .4;
-    filter: grayscale(.6);
-    pointer-events: none;
-    cursor: not-allowed;
-}
-.day-grid.mode-bar-night .day-cell[data-dow="5"],
-.day-grid.mode-bar-night .day-cell[data-dow="6"] {
-    opacity: 1;
-    filter: none;
-    pointer-events: auto;
-    cursor: pointer;
-    border-color: var(--accent);
-    background: var(--surface);
-    box-shadow: 0 0 0 2px rgba(224, 138, 30, .18), 0 4px 14px rgba(224, 138, 30, .3);
-    animation: barNightGlow 2s ease-in-out infinite;
-}
-@keyframes barNightGlow {
-    0%, 100% { box-shadow: 0 0 0 2px rgba(224, 138, 30, .18), 0 4px 14px rgba(224, 138, 30, .3); }
-    50% { box-shadow: 0 0 0 3px rgba(224, 138, 30, .32), 0 4px 20px rgba(224, 138, 30, .5); }
-}
 
 
 /* =====================================================================

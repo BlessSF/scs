@@ -6,8 +6,6 @@ require_login();
 
 $periodId = (int)($_GET['period_id'] ?? 0);
 $staffId  = (int)($_GET['staff_id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
 $user = current_user();
 
 // Slips were removed from the staff-facing portal entirely -- block direct
@@ -24,7 +22,7 @@ if ($user['role'] !== 'admin') {
     }
 }
 
-$slip = staff_period_slip($pdo, $periodId, $staffId, $shift);
+$slip = staff_period_slip($pdo, $periodId, $staffId);
 if (!$slip) {
     flash('error', 'Slip not found for that staff/period combination.');
     redirect($user['role'] === 'admin' ? '/periods/list.php' : '/portal/my-slips.php');
@@ -59,7 +57,7 @@ require __DIR__ . '/../includes/header.php';
 ?>
 <div class="actions no-print">
     <button class="btn" onclick="window.print()">Print This Slip</button>
-    <a class="btn btn-secondary" href="<?= $user['role']==='admin' ? BASE_URL.'/periods/view.php?id='.$period['id'].($shift ? '&shift='.urlencode($shift) : '') : BASE_URL.'/portal/my-slips.php' ?>">Back</a>
+    <a class="btn btn-secondary" href="<?= $user['role']==='admin' ? BASE_URL.'/periods/view.php?id='.$period['id'] : BASE_URL.'/portal/my-slips.php' ?>">Back</a>
 </div>
 
 <div class="slip">

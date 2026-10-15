@@ -5,9 +5,7 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $id = (int)($_GET['id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
-$summary = period_summary($pdo, $id, $shift);
+$summary = period_summary($pdo, $id);
 if (!$summary) {
     flash('error', 'Period not found.');
     redirect('/periods/list.php');
@@ -35,7 +33,6 @@ fputcsv($out, [
     date('M j, Y', strtotime($period['start_date'])) . ' - ' . date('M j, Y', strtotime($period['end_date'])),
     'Management share: ' . $period['management_share_percent'] . '%',
     'Status: ' . ucfirst($period['status']),
-    $shift ? ('Filter: ' . ($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only')) : 'Filter: All sales',
 ]);
 fputcsv($out, []);
 

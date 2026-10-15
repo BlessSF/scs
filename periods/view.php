@@ -5,10 +5,8 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $id = (int)($_GET['id'] ?? 0);
-$shift = $_GET['shift'] ?? '';
-$shift = in_array($shift, ['regular', 'bar_night'], true) ? $shift : null;
 
-$summary = period_summary($pdo, $id, $shift);
+$summary = period_summary($pdo, $id);
 if (!$summary) {
     flash('error', 'Period not found.');
     redirect('/periods/list.php');
@@ -43,7 +41,7 @@ if ($st !== '') {
     }
 }
 
-$qs = $shift ? '&shift=' . urlencode($shift) : '';
+$qs = '';
 $stQs = $st !== '' ? '&st=' . urlencode($st) : '';
 $baseUrl = BASE_URL . '/periods/view.php?id=' . $period['id'] . $qs;
 
@@ -56,16 +54,7 @@ require __DIR__ . '/../includes/header.php';
     &middot; <?= h(date('M j, Y', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?>
     &middot; Management share: <?= h($period['management_share_percent']) ?>%
     &middot; <span class="badge <?= $period['status']==='open' ? 'badge-regular' : 'badge-resigned' ?>"><?= h(ucfirst($period['status'])) ?></span>
-    <?php if ($shift): ?>
-        &middot; <span class="badge badge-regular">Filtered: <?= h($shift === 'bar_night' ? 'Bar Night only' : 'Regular day only') ?></span>
-    <?php endif; ?>
 </p>
-
-<div class="day-mode-toggle" style="margin: 0 0 18px;">
-    <a class="btn-mode<?= $shift === null ? ' is-active' : '' ?>" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?>">All Sales</a>
-    <a class="btn-mode<?= $shift === 'regular' ? ' is-active' : '' ?>" data-mode="regular" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?>&shift=regular">☀️ Regular Day Only</a>
-    <a class="btn-mode<?= $shift === 'bar_night' ? ' is-active' : '' ?>" data-mode="bar_night" href="<?= BASE_URL ?>/periods/view.php?id=<?= $period['id'] ?>&shift=bar_night">🌙 Bar Night Only</a>
-</div>
 
 <div class="actions">
     <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/form.php?id=<?= $period['id'] ?>">Edit Period</a>
@@ -143,10 +132,7 @@ require __DIR__ . '/../includes/header.php';
         <colgroup>
             <col style="width:18%"><!-- Name -->
             <col style="width:12%"> <!-- Status -->
-            <col style="width:5%"> <!-- Reg Days -->
-            <col style="width:8%"> <!-- Reg SC -->
-            <col style="width:4%"> <!-- Bar Days -->
-            <col style="width:7%"> <!-- Bar SC -->
+            <col style="width:5%"> <!-- Days -->
             <col style="width:8%"> <!-- Total SC -->
             <col style="width:7%"> <!-- Mgmt% -->
             <col style="width:8%"> <!-- Gross -->
@@ -161,9 +147,6 @@ require __DIR__ . '/../includes/header.php';
                 <th>Name</th>
                 <th>Status</th>
                 <th class="text-right">Days</th>
-                <th class="text-right">Reg. SC</th>
-                <th class="text-right">Bar</th>
-                <th class="text-right">Bar SC</th>
                 <th class="text-right">Total SC</th>
                 <th class="text-right">Mgmt</th>
                 <th class="text-right">Gross</th>
@@ -179,10 +162,7 @@ require __DIR__ . '/../includes/header.php';
             <tr>
                 <td style="white-space:normal; word-break:break-word; line-height:1.3;" title="<?= h($r['full_name']) ?>"><?= h($r['full_name']) ?><?php if (!empty($r['is_hidden'])): ?> <span class="badge badge-regular" title="Owner / Admin, from the Shared branch">Shared</span><?php endif; ?></td>
                 <td style="white-space:nowrap; padding-right:14px;"><span class="badge badge-<?= h($r['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$r['status']))) ?></span></td>
-                <td class="text-right" style="white-space:nowrap;"><?= (int)$r['regular_days'] ?></td>
-                <td class="text-right" style="white-space:nowrap;"><?= money($r['regular_sc']) ?></td>
-                <td class="text-right" style="white-space:nowrap;"><?= (int)$r['bar_night_days'] ?></td>
-                <td class="text-right" style="white-space:nowrap;"><?= money($r['bar_night_sc']) ?></td>
+                <td class="text-right" style="white-space:nowrap;"><?= (int)$r['days_worked'] ?></td>
                 <td class="text-right" style="white-space:nowrap;"><?= money($r['total_sc']) ?></td>
                 <td class="text-right" style="white-space:nowrap;"><?= money($r['management_share']) ?></td>
                 <td class="text-right" style="white-space:nowrap;"><?= money($r['gross']) ?></td>
@@ -205,17 +185,14 @@ require __DIR__ . '/../includes/header.php';
             </tr>
         <?php endforeach; ?>
         <?php if (!$rows): ?>
-            <tr><td colspan="14" class="muted"><?= $st !== '' ? 'No ' . h(strtolower($STATUS_LABELS[$st])) . ' staff in this period.' : 'No duty records fall within this period\'s date range yet for this branch.' ?></td></tr>
+            <tr><td colspan="11" class="muted"><?= $st !== '' ? 'No ' . h(strtolower($STATUS_LABELS[$st])) . ' staff in this period.' : 'No duty records fall within this period\'s date range yet for this branch.' ?></td></tr>
         <?php endif; ?>
         </tbody>
         <?php if ($rows): ?>
         <tfoot>
             <tr class="total-row">
                 <td colspan="2">TOTAL</td>
-                <td class="text-right"><?= array_sum(array_column($rows, 'regular_days')) ?></td>
-                <td class="text-right"><?= money(array_sum(array_column($rows, 'regular_sc'))) ?></td>
-                <td class="text-right"><?= array_sum(array_column($rows, 'bar_night_days')) ?></td>
-                <td class="text-right"><?= money(array_sum(array_column($rows, 'bar_night_sc'))) ?></td>
+                <td class="text-right"><?= array_sum(array_column($rows, 'days_worked')) ?></td>
                 <td class="text-right"><?= money($totals['total_sc']) ?></td>
                 <td class="text-right"><?= money($totals['management_share']) ?></td>
                 <td class="text-right"><?= money($totals['gross']) ?></td>

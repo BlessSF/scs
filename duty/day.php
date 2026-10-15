@@ -18,25 +18,16 @@ if (!$branch) {
 }
 require_branch_access($branchId);
 
-// Bar Night only applies to Friday (5) and Saturday (6); every other day
-// only ever has a single Regular entry.
-$dow = (int)date('w', strtotime($date));
-$isBarNightDay = in_array($dow, [5, 6], true);
-$shifts = $isBarNightDay ? ['regular', 'bar_night'] : ['regular'];
-$shiftLabels = ['regular' => 'Regular', 'bar_night' => '🌙 Bar Night'];
 
 $stmt = $pdo->prepare('SELECT * FROM duty_days WHERE duty_date = ? AND branch_id = ?');
 $stmt->execute([$date, $branchId]);
-$dutyDaysByShift = [];
-foreach ($stmt->fetchAll() as $row) {
-    $dutyDaysByShift[$row['shift'] ?? 'regular'] = $row;
-}
+$dutyDay = $stmt->fetch() ?: null;
 
-$presentIdsByShift = [];
-foreach ($dutyDaysByShift as $shift => $dd) {
+$presentIds = [];
+if ($dutyDay) {
     $s2 = $pdo->prepare('SELECT staff_id FROM duty_attendance WHERE duty_day_id = ?');
-    $s2->execute([$dd['id']]);
-    $presentIdsByShift[$shift] = array_column($s2->fetchAll(), 'staff_id');
+    $s2->execute([$dutyDay['id']]);
+    $presentIds = array_column($s2->fetchAll(), 'staff_id');
 }
 
 // Includes staff whose home branch is this one, plus anyone additionally
@@ -51,44 +42,27 @@ $visitingIds  = [];
 $validStaffIds = array_merge($allStaffIds, $visitingIds);
 
 // Which of THIS branch's staff are already on duty at another branch the same
-// day (per shift) -- shown as an "At Hero today" tag and pre-ticked on a new entry.
-$elsewhereByShift = [];
-foreach ($shifts as $sh) { $elsewhereByShift[$sh] = staff_on_duty_elsewhere($branchId, $date, $sh); }
+// day -- shown as an "At Hero today" tag and pre-ticked on a new entry.
+$elsewhere = staff_on_duty_elsewhere($branchId, $date);
 
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
 
-    $postedAmounts = $_POST['total_amount'] ?? [];
-    $postedNotes   = $_POST['notes'] ?? [];
-    $postedPresent = $_POST['present'] ?? [];
-
-    $totalsByShift = [];
-    foreach ($shifts as $shift) {
-        $amt = (float)($postedAmounts[$shift] ?? 0);
-        if ($amt < 0) {
-            $errors[] = ($shiftLabels[$shift] ?? $shift) . ': amount cannot be negative.';
-        }
-        $totalsByShift[$shift] = $amt;
+    $amount = (float)($_POST['total_amount'] ?? 0);
+    if ($amount < 0) {
+        $errors[] = 'Amount cannot be negative.';
     }
+    $notes = trim($_POST['notes'] ?? '');
+    $presentPost = array_values(array_unique(array_map('intval', $_POST['present'] ?? [])));
+    // Only staff actually offered on this page (this branch's roster).
+    $presentPost = array_values(array_intersect($presentPost, $validStaffIds));
 
     if (!$errors) {
         $pdo->beginTransaction();
         try {
-            foreach ($shifts as $shift) {
-                $amount = $totalsByShift[$shift];
-                $notes = trim($postedNotes[$shift] ?? '');
-                $presentPost = array_values(array_unique(array_map('intval', $postedPresent[$shift] ?? [])));
-                // Only staff actually offered on this page (this branch's roster or the visiting list).
-                $presentPost = array_values(array_intersect($presentPost, $validStaffIds));
-
-                $existing = $dutyDaysByShift[$shift] ?? null;
-
-                // For Bar Night, skip creating a brand-new empty row if nothing
-                // was actually entered (e.g. the cashier only filled Regular).
-                if ($shift === 'bar_night' && !$existing && $amount <= 0 && !$presentPost && $notes === '') {
-                    continue;
-                }
+            {
+                $existing = $dutyDay;
 
                 if ($existing) {
                     $u = $pdo->prepare('UPDATE duty_days SET total_amount=?, notes=? WHERE id=?');
@@ -96,8 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $dutyDayId = $existing['id'];
                     $pdo->prepare('DELETE FROM duty_attendance WHERE duty_day_id = ?')->execute([$dutyDayId]);
                 } else {
-                    $i = $pdo->prepare('INSERT INTO duty_days (branch_id, duty_date, shift, total_amount, notes) VALUES (?,?,?,?,?)');
-                    $i->execute([$branchId, $date, $shift, $amount, $notes]);
+                    $i = $pdo->prepare('INSERT INTO duty_days (branch_id, duty_date, total_amount, notes) VALUES (?,?,?,?)');
+                    $i->execute([$branchId, $date, $amount, $notes]);
                     $dutyDayId = (int)$pdo->lastInsertId();
                 }
 
@@ -158,7 +132,7 @@ $pageTitle = 'Duty Entry — ' . date('M j, Y', strtotime($date));
 require __DIR__ . '/../includes/header.php';
 ?>
 <h1><?= date('l, F j, Y', strtotime($date)) ?></h1>
-<p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked<?= $isBarNightDay ? ' &mdash; separately for Regular hours and Bar Night.' : '.' ?></p>
+<p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked.</p>
 
 <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
 
@@ -166,26 +140,21 @@ require __DIR__ . '/../includes/header.php';
     <?= csrf_field() ?>
     <input type="hidden" name="branch_id" value="<?= $branchId ?>">
 
-    <div class="<?= $isBarNightDay ? 'shift-grid' : '' ?>">
-        <?php foreach ($shifts as $shift):
-            $dutyDay   = $dutyDaysByShift[$shift] ?? null;
-            $presentIds = $presentIdsByShift[$shift] ?? [];
-            $listId    = 'staffList_' . $shift;
-            $counterId = 'presentCount_' . $shift;
+    <div>
+        <?php
+            $listId    = 'staffList_regular';
+            $counterId = 'presentCount_regular';
         ?>
-        <div class="card shift-panel shift-panel-<?= h($shift) ?>">
-            <?php if ($isBarNightDay): ?>
-                <h2 class="shift-panel-title"><?= h($shiftLabels[$shift]) ?></h2>
-            <?php endif; ?>
+        <div class="card shift-panel">
 
             <div class="form-row">
                 <div>
-                    <label for="total_amount_<?= $shift ?>">Total Service Charge<?= $isBarNightDay ? '' : ' for the Day' ?></label>
-                    <input type="number" step="0.01" min="0" id="total_amount_<?= $shift ?>" name="total_amount[<?= $shift ?>]" value="<?= h($dutyDay['total_amount'] ?? '') ?>" <?= $shift === 'regular' ? 'required' : '' ?>>
+                    <label for="total_amount">Total Service Charge for the Day</label>
+                    <input type="number" step="0.01" min="0" id="total_amount" name="total_amount" value="<?= h($dutyDay['total_amount'] ?? '') ?>" required>
                 </div>
                 <div>
-                    <label for="notes_<?= $shift ?>">Notes (optional)</label>
-                    <input type="text" id="notes_<?= $shift ?>" name="notes[<?= $shift ?>]" value="<?= h($dutyDay['notes'] ?? '') ?>">
+                    <label for="notes">Notes (optional)</label>
+                    <input type="text" id="notes" name="notes" value="<?= h($dutyDay['notes'] ?? '') ?>">
                 </div>
             </div>
 
@@ -203,17 +172,17 @@ require __DIR__ . '/../includes/header.php';
 
             <div class="staff-select-list" id="<?= $listId ?>" data-counter="<?= $counterId ?>">
                 <?php foreach ($allStaff as $s):
-                    $elsewhere = $elsewhereByShift[$shift][(int)$s['id']] ?? null;
+                    $elsewhereAt = $elsewhere[(int)$s['id']] ?? null;
                     // New regular-day entry: a staff member who is on duty at another branch
                     // today is still credited here, so pre-tick them (untick if not wanted).
-                    $autoTick = ($elsewhere !== null && !$dutyDay && $shift === 'regular');
+                    $autoTick = ($elsewhereAt !== null && !$dutyDay);
                     $checked = in_array($s['id'], $presentIds) || $autoTick; ?>
                     <label class="staff-row<?= $checked ? ' is-checked' : '' ?>">
-                        <input type="checkbox" name="present[<?= $shift ?>][]" value="<?= $s['id'] ?>" <?= $checked ? 'checked' : '' ?>>
+                        <input type="checkbox" name="present[]" value="<?= $s['id'] ?>" <?= $checked ? 'checked' : '' ?>>
                         <span class="sr-check" aria-hidden="true"></span>
                         <span class="sr-name"><?= h($s['full_name']) ?></span>
-                        <?php if ($elsewhere !== null): ?>
-                            <span class="badge badge-elsewhere" title="Also on duty at another branch today. Still credited here when ticked.">At <?= h($elsewhere) ?> today</span>
+                        <?php if ($elsewhereAt !== null): ?>
+                            <span class="badge badge-elsewhere" title="Also on duty at another branch today. Still credited here when ticked.">At <?= h($elsewhereAt) ?> today</span>
                         <?php endif; ?>
                         <span class="badge badge-<?= h($s['status']) ?>"><?= h(ucfirst(str_replace('_',' ',$s['status']))) ?></span>
                     </label>
@@ -224,7 +193,6 @@ require __DIR__ . '/../includes/header.php';
             </div>
 
         </div>
-        <?php endforeach; ?>
     </div>
 
     <div class="sticky-save-bar">
