@@ -177,20 +177,20 @@ require __DIR__ . '/../includes/header.php';
                 <td class="small"><?= h($s['remarks'] ?: '—') ?></td>
                 <td class="small"><?= $u ? h($u['username']) : '<span class="muted">none</span>' ?></td>
                 <td>
-                    <div class="row-actions">
-                        <a class="btn btn-sm btn-secondary" href="<?= BASE_URL ?>/staff/form.php?id=<?= $s['id'] ?>">Edit</a>
+                    <div class="row-actions" style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
+                        <a class="icon-btn ib-edit" title="Edit" aria-label="Edit <?= h($s['full_name']) ?>" href="<?= BASE_URL ?>/staff/form.php?id=<?= $s['id'] ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></a>
                         <?php if ($u): ?>
                             <form method="post" action="<?= BASE_URL ?>/staff/reset_password.php" style="display:inline;" onsubmit="return confirm('Reset the password for <?= h(addslashes($s['full_name'])) ?>? Their current password will stop working immediately.');">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="staff_id" value="<?= $s['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-secondary">Reset Password</button>
+                                <button type="submit" class="icon-btn ib-key" title="Reset password" aria-label="Reset password for <?= h($s['full_name']) ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2"/></svg></button>
                             </form>
                         <?php endif; ?>
                         <?php if (is_admin()): ?>
                             <form method="post" action="<?= BASE_URL ?>/staff/delete.php" style="display:inline;" onsubmit="return confirm('Delete <?= h(addslashes($s['full_name'])) ?>? This cannot be undone. Staff with existing duty or deduction records can\'t be deleted — mark them Resigned instead.');">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="id" value="<?= $s['id'] ?>">
-                                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                                <button type="submit" class="icon-btn ib-del" title="Delete" aria-label="Delete <?= h($s['full_name']) ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
                             </form>
                         <?php endif; ?>
                     </div>
@@ -203,4 +203,15 @@ require __DIR__ . '/../includes/header.php';
         </tbody>
     </table>
 </div>
+<style>
+.icon-btn { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
+    border:1px solid var(--border-strong); background:#fff; color:var(--text-muted); cursor:pointer; text-decoration:none;
+    transition:background .12s, color .12s, border-color .12s, transform .1s; }
+.icon-btn:hover { transform:translateY(-1px); }
+.icon-btn.ib-edit:hover { background:var(--primary); border-color:var(--primary); color:#fff; }
+.icon-btn.ib-key:hover  { background:#e08a1e; border-color:#e08a1e; color:#fff; }
+.icon-btn.ib-del:hover  { background:var(--danger); border-color:var(--danger); color:#fff; }
+.icon-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.row-actions form { margin:0 !important; display:inline-flex !important; }
+</style>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
