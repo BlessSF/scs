@@ -11,6 +11,7 @@ require __DIR__ . '/includes/header.php';
 
 if (in_array($user['role'], ['admin', 'cashier', 'owner'], true)) {
     $isCashier = $user['role'] === 'cashier';
+    $isAdmin   = $user['role'] === 'admin'; // admin gets the branch cards + monthly chart
     $isOwner   = $user['role'] === 'owner'; // read-only company view: no branch drill-downs, no admin shortcuts
     $lockedBranchId = current_branch_id(); // null = sees every branch
     $accessibleIds  = accessible_branch_ids(); // null = every branch; else own branch + its sub-branches
@@ -117,7 +118,9 @@ if (in_array($user['role'], ['admin', 'cashier', 'owner'], true)) {
         <?php endif; ?>
     </div>
 
-    <?php if (count($branchStats) > 1): ?>
+    <?php if ($isAdmin) { require __DIR__ . '/includes/admin_dashboard.php'; } ?>
+
+    <?php if (!$isAdmin && count($branchStats) > 1): ?>
     <div class="section-heading">
         <h2>By Branch — Today</h2>
         <?php if (!$isOwner): ?><span class="hint">Tap a branch to open its page</span><?php endif; ?>
@@ -145,7 +148,7 @@ if (in_array($user['role'], ['admin', 'cashier', 'owner'], true)) {
             <p class="muted">No branches yet<?= $isCashier ? '.' : '. <a href="' . BASE_URL . '/branches/form.php">Add one</a>.' ?></p>
         <?php endif; ?>
     </div>
-    <?php elseif ($branchStats): ?>
+    <?php elseif (!$isAdmin && $branchStats): ?>
     <div class="branch-spotlight branch-<?= h(branch_theme_key($branchStats[0]['name'])) ?>">
         <div>
             <div class="sp-title">Your Branch</div>
@@ -164,7 +167,7 @@ if (in_array($user['role'], ['admin', 'cashier', 'owner'], true)) {
     </div>
     <?php endif; ?>
 
-    <?php if (!$isCashier && count($branchStats) > 1): ?>
+    <?php if (!$isAdmin && !$isCashier && count($branchStats) > 1): ?>
     <div class="section-heading">
         <h2>By Branch — This Month</h2>
         <span class="hint">Tap a branch to spotlight it</span>
