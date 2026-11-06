@@ -120,3 +120,7 @@ scs/
   server-side, not just hidden in the UI.
 - Change the default admin password before putting this on a shared or
   public server, and consider adding HTTPS if deploying beyond localhost.
+
+## Locking a period
+
+Admins can lock a period (*Periods → 🔒 Lock*, or the button on a period's summary page). While locked, branch/cashier accounts can no longer add or change duty entries inside that period's dates, and staff-roster backfills skip those days. Only admins can lock/unlock, and admins can always edit. On an existing database, run `database/add_period_lock.sql` once.

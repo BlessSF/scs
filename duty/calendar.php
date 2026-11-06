@@ -53,6 +53,10 @@ require __DIR__ . '/../includes/header.php';
 <h1>Duty &amp; Service Charge Entry</h1>
 <p class="subtitle">Click a day to record its total service charge and mark which staff were on duty for the selected branch.</p>
 
+<?php foreach (locked_periods_in_range($pdo, $branchId, $firstOfMonth, date('Y-m-t', strtotime($firstOfMonth))) as $lp): ?>
+<div class="alert alert-info">🔒 <?= h($lp['name']) ?> (<?= h(date('M j', strtotime($lp['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($lp['end_date']))) ?>) is locked<?= is_admin() ? ' &mdash; only admins can edit it.' : ' &mdash; days in this range are read-only.' ?></div>
+<?php endforeach; ?>
+
 <div class="card">
     <?php if (is_branch_locked()): ?>
     <p style="margin:0 0 16px;"><strong><?= h($branch['name']) ?></strong></p>

@@ -54,9 +54,17 @@ require __DIR__ . '/../includes/header.php';
     &middot; <?= h(date('M j, Y', strtotime($period['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($period['end_date']))) ?>
     &middot; Management share: <?= h($period['management_share_percent']) ?>%
     &middot; <span class="badge <?= $period['status']==='open' ? 'badge-regular' : 'badge-resigned' ?>"><?= h(ucfirst($period['status'])) ?></span>
+    <?php if (!empty($period['is_locked'])): ?>&middot; <span class="badge badge-resigned">🔒 Locked</span><?php endif; ?>
 </p>
 
 <div class="actions">
+    <form method="post" action="<?= BASE_URL ?>/periods/lock.php" style="display:inline;">
+        <?= csrf_field() ?>
+        <input type="hidden" name="id" value="<?= $period['id'] ?>">
+        <input type="hidden" name="back" value="view">
+        <input type="hidden" name="action" value="<?= !empty($period['is_locked']) ? 'unlock' : 'lock' ?>">
+        <button type="submit" class="btn"><?= !empty($period['is_locked']) ? '🔓 Unlock Period' : '🔒 Lock Period' ?></button>
+    </form>
     <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/form.php?id=<?= $period['id'] ?>">Edit Period</a>
     <a class="btn btn-secondary" href="<?= BASE_URL ?>/periods/list.php">Back to List</a>
     <a class="btn" href="<?= BASE_URL ?>/periods/export_csv.php?id=<?= $period['id'] ?><?= $qs ?>">⬇ Export CSV</a>

@@ -45,9 +45,15 @@ $validStaffIds = array_merge($allStaffIds, $visitingIds);
 // day -- shown as an "At Hero today" tag and pre-ticked on a new entry.
 $elsewhere = staff_on_duty_elsewhere($branchId, $date);
 
+$lockedPeriod = locked_period_for_date($pdo, $branchId, $date);
+$readOnly = $lockedPeriod && !is_admin();   // admins can always edit
+
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
+    if ($readOnly) {
+        $errors[] = 'This period (' . $lockedPeriod['name'] . ') is locked. Ask an admin to unlock it before making changes.';
+    }
 
     $amount = (float)($_POST['total_amount'] ?? 0);
     if ($amount < 0) {
@@ -135,9 +141,15 @@ require __DIR__ . '/../includes/header.php';
 <p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked.</p>
 
 <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
+<?php if ($lockedPeriod && $readOnly): ?>
+<div class="alert alert-error">🔒 <?= h($lockedPeriod['name']) ?> is locked &mdash; this entry is read-only. Only an admin can unlock it.</div>
+<?php elseif ($lockedPeriod): ?>
+<div class="alert alert-info">🔒 <?= h($lockedPeriod['name']) ?> is locked for other users. You can still edit because you are an admin.</div>
+<?php endif; ?>
 
 <form method="post" action="">
     <?= csrf_field() ?>
+    <fieldset <?= $readOnly ? 'disabled' : '' ?> style="border:0;padding:0;margin:0;min-width:0;">
     <input type="hidden" name="branch_id" value="<?= $branchId ?>">
 
     <div>
@@ -194,10 +206,11 @@ require __DIR__ . '/../includes/header.php';
 
         </div>
     </div>
+    </fieldset>
 
     <div class="sticky-save-bar">
         <div class="actions">
-            <button type="submit" class="btn">Save Day</button>
+            <?php if (!$readOnly): ?><button type="submit" class="btn">Save Day</button><?php endif; ?>
             <a class="btn btn-secondary" href="<?= BASE_URL ?>/duty/calendar.php?branch_id=<?= $branchId ?>&month=<?= date('n', strtotime($date)) ?>&year=<?= date('Y', strtotime($date)) ?>">Back to Calendar</a>
         </div>
     </div>

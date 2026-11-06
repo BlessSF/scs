@@ -222,6 +222,9 @@ function branch_option_label($branch) {
  * @return void
  */
 function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
+    // Non-admins must not alter attendance inside locked periods.
+    $lockSql = is_admin() ? '' : " AND NOT EXISTS (SELECT 1 FROM periods lp WHERE lp.is_locked = 1
+        AND lp.branch_id = dd.branch_id AND dd.duty_date BETWEEN lp.start_date AND lp.end_date)";
     $s = $pdo->prepare('SELECT branch_id, excluded_days, counted_months, follow_staff_id FROM staff WHERE id = ?');
     $s->execute([$staffId]);
     $row = $s->fetch();
@@ -244,7 +247,7 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
     // 1) Remove stored rows on branches they are no longer assigned to.
     $pdo->prepare("DELETE da FROM duty_attendance da
         JOIN duty_days dd ON dd.id = da.duty_day_id
-        WHERE da.staff_id = ? AND dd.branch_id NOT IN ($phB)")
+        WHERE da.staff_id = ? AND dd.branch_id NOT IN ($phB)$lockSql")
         ->execute(array_merge([$staffId], $branchIds));
 
     // 2) Remove stored rows on excluded weekdays (DAYOFWEEK: 1=Sun ... 7=Sat; we store 0=Sun).
@@ -253,7 +256,7 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
         $phD = implode(',', array_fill(0, count($mysqlDays), '?'));
         $pdo->prepare("DELETE da FROM duty_attendance da
             JOIN duty_days dd ON dd.id = da.duty_day_id
-            WHERE da.staff_id = ? AND DAYOFWEEK(dd.duty_date) IN ($phD)")
+            WHERE da.staff_id = ? AND DAYOFWEEK(dd.duty_date) IN ($phD)$lockSql")
             ->execute(array_merge([$staffId], $mysqlDays));
     }
 
@@ -262,7 +265,7 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
         $phM = implode(',', array_fill(0, count($months), '?'));
         $pdo->prepare("DELETE da FROM duty_attendance da
             JOIN duty_days dd ON dd.id = da.duty_day_id
-            WHERE da.staff_id = ? AND DATE_FORMAT(dd.duty_date, '%Y-%m') NOT IN ($phM)")
+            WHERE da.staff_id = ? AND DATE_FORMAT(dd.duty_date, '%Y-%m') NOT IN ($phM)$lockSql")
             ->execute(array_merge([$staffId], $months));
     }
 
@@ -275,7 +278,7 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
             WHERE da.staff_id = ?
               AND NOT EXISTS (SELECT 1 FROM duty_attendance f
                               JOIN duty_days fd ON fd.id = f.duty_day_id
-                              WHERE f.staff_id = ? AND fd.duty_date = dd.duty_date)");
+                              WHERE f.staff_id = ? AND fd.duty_date = dd.duty_date)$lockSql");
         $sel->execute([$staffId, $followId]);
         $delIds = array_map('intval', $sel->fetchAll(PDO::FETCH_COLUMN));
         foreach (array_chunk($delIds, 500) as $chunk) {
@@ -286,7 +289,7 @@ function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
 
     // 3) Add rows for every duty day in assigned branches that isn't an excluded weekday.
     $sql = "INSERT IGNORE INTO duty_attendance (duty_day_id, staff_id)
-            SELECT dd.id, ? FROM duty_days dd WHERE dd.branch_id IN ($phB)";
+            SELECT dd.id, ? FROM duty_days dd WHERE dd.branch_id IN ($phB)$lockSql";
     $params = array_merge([$staffId], $branchIds);
     if ($excluded) {
         $sql .= " AND DAYOFWEEK(dd.duty_date) NOT IN ($phD)";
@@ -894,4 +897,31 @@ function staff_period_slip($pdo, $periodId, $staffId) {
         }
     }
     return null;
+}
+
+/**
+ * The locked period (if any) covering $date for $branchId, else null.
+ * While locked, only admins may change duty entries inside it.
+ */
+function locked_period_for_date($pdo, $branchId, $date) {
+    try {
+        $st = $pdo->prepare('SELECT * FROM periods WHERE is_locked = 1 AND branch_id = ?
+                             AND ? BETWEEN start_date AND end_date LIMIT 1');
+        $st->execute([(int)$branchId, $date]);
+        return $st->fetch() ?: null;
+    } catch (PDOException $e) {
+        return null; // is_locked column not migrated yet
+    }
+}
+
+/** Locked periods for a branch that overlap the given date range. */
+function locked_periods_in_range($pdo, $branchId, $from, $to) {
+    try {
+        $st = $pdo->prepare('SELECT * FROM periods WHERE is_locked = 1 AND branch_id = ?
+                             AND start_date <= ? AND end_date >= ? ORDER BY start_date');
+        $st->execute([(int)$branchId, $to, $from]);
+        return $st->fetchAll();
+    } catch (PDOException $e) {
+        return [];
+    }
 }
