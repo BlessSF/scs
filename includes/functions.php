@@ -222,9 +222,9 @@ function branch_option_label($branch) {
  * @return void
  */
 function backfill_hidden_staff_duty_attendance($pdo, $staffId) {
-    // Non-admins must not alter attendance inside locked periods.
-    $lockSql = is_admin() ? '' : " AND NOT EXISTS (SELECT 1 FROM periods lp WHERE lp.is_locked = 1
-        AND lp.branch_id = dd.branch_id AND dd.duty_date BETWEEN lp.start_date AND lp.end_date)";
+    // Non-admins must not alter attendance inside locked months.
+    $lockSql = is_admin() ? '' : " AND NOT EXISTS (SELECT 1 FROM month_branch_locks ml
+        WHERE ml.ym = DATE_FORMAT(dd.duty_date, '%Y-%m') AND ml.branch_id IN (0, dd.branch_id))";
     $s = $pdo->prepare('SELECT branch_id, excluded_days, counted_months, follow_staff_id FROM staff WHERE id = ?');
     $s->execute([$staffId]);
     $row = $s->fetch();
@@ -900,27 +900,37 @@ function staff_period_slip($pdo, $periodId, $staffId) {
 }
 
 /**
- * The locked period (if any) covering $date for $branchId, else null.
- * While locked, only admins may change duty entries inside it.
+ * The lock (if any) covering $date for $branchId, else null.
+ * Locks are per calendar month and per branch; branch_id 0 means "all
+ * branches". While locked, only admins may change that branch's duty entries.
  */
 function locked_period_for_date($pdo, $branchId, $date) {
     try {
-        $st = $pdo->prepare('SELECT * FROM periods WHERE is_locked = 1 AND branch_id = ?
-                             AND ? BETWEEN start_date AND end_date LIMIT 1');
-        $st->execute([(int)$branchId, $date]);
-        return $st->fetch() ?: null;
+        $ym = date('Y-m', strtotime($date));
+        $st = $pdo->prepare('SELECT * FROM month_branch_locks WHERE ym = ? AND branch_id IN (0, ?) LIMIT 1');
+        $st->execute([$ym, (int)$branchId]);
+        $row = $st->fetch();
+        if (!$row) return null;
+        $row['name'] = date('F Y', strtotime($ym . '-01'));
+        return $row;
     } catch (PDOException $e) {
-        return null; // is_locked column not migrated yet
+        return null; // month_branch_locks table not created yet
     }
 }
 
-/** Locked periods for a branch that overlap the given date range. */
+/** Locks that apply to $branchId and overlap the given date range. */
 function locked_periods_in_range($pdo, $branchId, $from, $to) {
     try {
-        $st = $pdo->prepare('SELECT * FROM periods WHERE is_locked = 1 AND branch_id = ?
-                             AND start_date <= ? AND end_date >= ? ORDER BY start_date');
-        $st->execute([(int)$branchId, $to, $from]);
-        return $st->fetchAll();
+        $st = $pdo->prepare('SELECT DISTINCT ym FROM month_branch_locks
+                             WHERE ym BETWEEN ? AND ? AND branch_id IN (0, ?) ORDER BY ym');
+        $st->execute([date('Y-m', strtotime($from)), date('Y-m', strtotime($to)), (int)$branchId]);
+        $rows = $st->fetchAll();
+        foreach ($rows as &$r) {
+            $r['name'] = date('F Y', strtotime($r['ym'] . '-01'));
+            $r['start_date'] = $r['ym'] . '-01';
+            $r['end_date'] = date('Y-m-t', strtotime($r['start_date']));
+        }
+        return $rows;
     } catch (PDOException $e) {
         return [];
     }
