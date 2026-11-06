@@ -74,7 +74,9 @@ function nav_item($needle, $href, $label, $icon, $here) {
                     <small><?= h(ucfirst($user['role'])) ?><?= $__lockedBranch ? ' &middot; <a href="' . BASE_URL . '/branches/view.php?id=' . (int)$__lockedBranch['id'] . '">' . h($__lockedBranch['name']) . '</a>' : '' ?></small>
                 </span>
             </div>
-            <a href="<?= BASE_URL ?>/logout.php" class="btn-link" title="Sign out">Logout</a>
+            <a href="<?= BASE_URL ?>/logout.php" class="btn-link btn-logout" title="Logout" aria-label="Logout">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            </a>
         </div>
     </div>
 </header>

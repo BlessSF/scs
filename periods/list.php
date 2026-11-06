@@ -51,15 +51,8 @@ require __DIR__ . '/../includes/header.php';
                 <td><?= h($p['branch_name']) ?></td>
                 <td><?= h(date('M j, Y', strtotime($p['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($p['end_date']))) ?></td>
                 <td><?= h($p['management_share_percent']) ?>%</td>
-                <td><span class="badge <?= $p['status']==='open' ? 'badge-regular' : 'badge-resigned' ?>"><?= h(ucfirst($p['status'])) ?></span>
-                    <?php if (!empty($p['is_locked'])): ?><span class="badge badge-resigned" title="Locked <?= h($p['locked_at'] ?? '') ?>">🔒 Locked</span><?php endif; ?></td>
+                <td><span class="badge <?= $p['status']==='open' ? 'badge-regular' : 'badge-resigned' ?>"><?= h(ucfirst($p['status'])) ?></span></td>
                 <td>
-                    <form method="post" action="<?= BASE_URL ?>/periods/lock.php" style="display:inline;">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="id" value="<?= $p['id'] ?>">
-                        <input type="hidden" name="action" value="<?= !empty($p['is_locked']) ? 'unlock' : 'lock' ?>">
-                        <button type="submit" class="btn btn-sm btn-secondary"><?= !empty($p['is_locked']) ? '🔓 Unlock' : '🔒 Lock' ?></button>
-                    </form>
                     <a class="btn btn-sm" href="<?= BASE_URL ?>/periods/view.php?id=<?= $p['id'] ?>">View Summary</a>
                     <a class="btn btn-sm btn-secondary" href="<?= BASE_URL ?>/periods/form.php?id=<?= $p['id'] ?>">Edit</a>
                     <form method="post" action="<?= BASE_URL ?>/periods/delete.php" style="display:inline;" onsubmit="return confirm('Delete period &quot;<?= h(addslashes($p['name'])) ?>&quot;? This also removes any deductions recorded for it. This cannot be undone.');">
