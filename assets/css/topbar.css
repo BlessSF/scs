@@ -1,47 +1,76 @@
 /* Top bar -- flat, minimal. Loaded after style.css so it overrides the older rules. */
 .topbar {
-    background: #0f4f42;
-    border-bottom: 1px solid rgba(0,0,0,.25);
-    box-shadow: none;
+    background: linear-gradient(100deg, #0a4036 0%, #0f5748 55%, #146a58 100%);
+    border-bottom: 1px solid rgba(0,0,0,.3);
+    box-shadow: 0 1px 0 rgba(255,255,255,.07) inset, 0 6px 18px rgba(5,28,22,.18);
 }
 .topbar::after { content: none; }
-.topbar-inner { max-width: 1600px; margin: 0 auto; padding: 0 20px; gap: 20px; flex-wrap: nowrap; align-items: center; }
+.topbar-inner { max-width: 1600px; margin: 0 auto; padding: 0 22px; gap: 26px; flex-wrap: nowrap; align-items: center; min-height: 64px; }
 
-.brand { font-size: 1.05rem; font-weight: 700; letter-spacing: 0; white-space: nowrap; flex: none; padding: 14px 0; gap: 0; }
+/* Brand: monogram + two-line wordmark */
+.brand { gap: 12px; white-space: nowrap; flex: none; padding: 10px 0; letter-spacing: 0; font-weight: 700; }
 .brand::before { content: none; }
+.brand-mark {
+    width: 38px; height: 38px; flex: none; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; font-weight: 800; color: #f4b74a;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(244,183,74,.55);
+}
+.brand-text { display: flex; flex-direction: column; line-height: 1.15; }
+.brand-text strong { font-size: 1.02rem; font-weight: 700; color: #fff; }
+.brand-text small { font-size: .62rem; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.55); margin-top: 2px; }
 
 .user-menu-mobile { display: none; }
 .nav-toggle { display: none; }
 
 @media (min-width: 769px) {
     .main-nav {
-        flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; justify-content: flex-start; gap: 0;
+        flex: 1 1 auto; min-width: 0; flex-wrap: nowrap; justify-content: flex-start; gap: 2px;
         margin: 0; padding: 0; background: none; border: 0; border-radius: 0; backdrop-filter: none;
-        align-self: stretch;
+        align-self: stretch; align-items: flex-end;
     }
     .main-nav a {
-        display: flex; align-items: center; white-space: nowrap;
-        margin: 0; padding: 0 12px; font-size: .84rem; font-weight: 600;
-        color: rgba(255,255,255,.72); background: none; border-radius: 0; box-shadow: none;
-        border-bottom: 3px solid transparent; border-top: 3px solid transparent;
-        transform: none !important; transition: color .12s, border-color .12s;
+        display: flex; align-items: center; white-space: nowrap; height: 44px;
+        margin: 0 0 0 0; padding: 0 14px; font-size: .84rem; font-weight: 600;
+        color: rgba(255,255,255,.7); background: none; border-radius: 8px 8px 0 0; box-shadow: none;
+        border-bottom: 3px solid transparent; border-top: 0;
+        transform: none !important; transition: color .12s, background .12s, border-color .12s;
     }
-    .main-nav a:hover { color: #fff; background: none; border-bottom-color: rgba(255,255,255,.35); }
-    .main-nav a.active { color: #fff; background: none; box-shadow: none; border-bottom-color: #f4b74a; }
+    .main-nav a:hover { color: #fff; background: rgba(255,255,255,.08); border-bottom-color: rgba(255,255,255,.3); }
+    .main-nav a.active {
+        color: #fff; background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.16));
+        border-bottom-color: #f4b74a; box-shadow: none;
+    }
 
-    .user-menu-desktop { display: flex; align-items: center; gap: 14px; flex: none; white-space: nowrap; margin-left: auto; }
-    .user-menu-desktop .um-info { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; line-height: 1.2; min-width: 0; max-width: 200px; }
-    .user-menu-desktop .um-info strong { color: #fff; font-size: .82rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-    .user-menu-desktop .um-info small { color: rgba(255,255,255,.65); font-size: .72rem; }
-    .user-menu-desktop .um-info small a { color: rgba(255,255,255,.9); text-decoration: underline; }
-    .user-menu-desktop .btn-link {
-        padding: 6px 14px; font-size: .8rem; font-weight: 600; border-radius: 6px;
-        background: none; border: 1px solid rgba(255,255,255,.35);
+    .user-menu-desktop { display: flex; align-items: center; gap: 10px; flex: none; white-space: nowrap; margin-left: auto; }
+    .user-menu-desktop .um-chip {
+        display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 6px;
+        background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); border-radius: 999px;
     }
-    .user-menu-desktop .btn-link:hover { background: rgba(255,255,255,.12); }
+    .user-menu-desktop .um-avatar {
+        width: 32px; height: 32px; border-radius: 50%; flex: none; justify-content: center;
+        font-size: .74rem; font-weight: 800; color: #0c4a3e; background: #f4e3bd;
+    }
+    .user-menu-desktop .um-info { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; line-height: 1.15; min-width: 0; max-width: 190px; }
+    .user-menu-desktop .um-info strong { color: #fff; font-size: .8rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .user-menu-desktop .um-info small { color: rgba(255,255,255,.62); font-size: .68rem; letter-spacing: .03em; }
+    .user-menu-desktop .um-info small a { color: #f4d79b; text-decoration: none; }
+    .user-menu-desktop .btn-link {
+        padding: 8px 16px; font-size: .78rem; font-weight: 700; border-radius: 999px;
+        background: #f4b74a; color: #3d2600 !important; border: 0;
+    }
+    .user-menu-desktop .btn-link:hover { background: #ffc967; }
+}
+/* Tighter bar on mid-size screens so nothing overlaps */
+@media (min-width: 769px) and (max-width: 1500px) {
+    .topbar-inner { gap: 16px; padding: 0 16px; }
+    .main-nav a { padding: 0 10px; font-size: .82rem; }
+    .brand-text small { display: none; }
+    .user-menu-desktop .um-info { display: none; }
+    .user-menu-desktop .um-chip { padding: 4px; }
 }
 
-.nav-toggle { width: 40px; height: 40px; background: none; border: 1px solid rgba(255,255,255,.3); border-radius: 6px; }
+.nav-toggle { width: 40px; height: 40px; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.25); border-radius: 10px; }
 
 /* Collapse to a hamburger menu: admin bar (many links) below 1240px, other roles below 769px */
 @media (max-width: 1240px) {

@@ -21,7 +21,11 @@ function nav_item($needle, $href, $label, $icon, $here) {
 <?php if ($user): ?>
 <header class="topbar<?= ($user['role'] ?? '') === 'admin' ? ' topbar-wide' : '' ?>">
     <div class="topbar-inner">
-        <a class="brand" href="<?= BASE_URL ?>/dashboard.php"><?= h(get_setting('company_name', 'Service Charge')) ?></a>
+        <?php $__co = get_setting('company_name', 'Service Charge'); ?>
+        <a class="brand" href="<?= BASE_URL ?>/dashboard.php">
+            <span class="brand-mark"><?= h(function_exists('mb_substr') ? mb_strtoupper(mb_substr($__co, 0, 1)) : strtoupper(substr($__co, 0, 1))) ?></span>
+            <span class="brand-text"><strong><?= h($__co) ?></strong><small>Service Charge</small></span>
+        </a>
         <button type="button" class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="mainNav">
             <span></span><span></span><span></span>
         </button>
@@ -58,12 +62,19 @@ function nav_item($needle, $href, $label, $icon, $here) {
                 <a href="<?= BASE_URL ?>/logout.php" class="btn-link">Logout</a>
             </div>
         </nav>
+        <?php
+            $__parts = preg_split('/\s+/', trim($user['full_name'] ?? ''));
+            $__ini = strtoupper(substr($__parts[0] ?? '?', 0, 1) . (count($__parts) > 1 ? substr(end($__parts), 0, 1) : ''));
+        ?>
         <div class="user-menu user-menu-desktop">
-            <span class="um-info">
-                <strong><?= h($user['full_name']) ?></strong>
-                <small><?= h(ucfirst($user['role'])) ?><?= $__lockedBranch ? ' · <a href="' . BASE_URL . '/branches/view.php?id=' . (int)$__lockedBranch['id'] . '">' . h($__lockedBranch['name']) . '</a>' : '' ?></small>
-            </span>
-            <a href="<?= BASE_URL ?>/logout.php" class="btn-link">Logout</a>
+            <div class="um-chip">
+                <span class="um-avatar" aria-hidden="true"><?= h($__ini) ?></span>
+                <span class="um-info">
+                    <strong><?= h($user['full_name']) ?></strong>
+                    <small><?= h(ucfirst($user['role'])) ?><?= $__lockedBranch ? ' &middot; <a href="' . BASE_URL . '/branches/view.php?id=' . (int)$__lockedBranch['id'] . '">' . h($__lockedBranch['name']) . '</a>' : '' ?></small>
+                </span>
+            </div>
+            <a href="<?= BASE_URL ?>/logout.php" class="btn-link" title="Sign out">Logout</a>
         </div>
     </div>
 </header>
