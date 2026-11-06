@@ -935,3 +935,42 @@ function locked_periods_in_range($pdo, $branchId, $from, $to) {
         return [];
     }
 }
+
+/**
+ * Prominent "this month is locked" banner (plus the small shared stylesheet
+ * for locked calendars / read-only forms). Echoes HTML.
+ */
+function render_lock_banner($monthName, $isAdmin) {
+    static $styled = false;
+    if (!$styled) {
+        $styled = true;
+        echo <<<'CSS'
+<style>
+.lock-banner { display:flex; gap:16px; align-items:center; padding:16px 20px; border-radius:16px; margin-bottom:20px;
+    background:linear-gradient(135deg,#fff5f3 0%,#ffe9e5 100%); border:1px solid #f3b9b0; box-shadow:0 2px 8px rgba(194,64,47,.08); }
+.lock-banner .lb-icon { flex:none; width:48px; height:48px; border-radius:50%; background:#c2402f; color:#fff;
+    display:flex; align-items:center; justify-content:center; font-size:1.4rem; box-shadow:0 3px 8px rgba(194,64,47,.35); }
+.lock-banner .lb-title { font-size:1.05rem; font-weight:800; color:#8f2c1f; }
+.lock-banner .lb-text { font-size:.88rem; color:#7a3a30; margin-top:2px; }
+.lock-banner.is-admin { background:linear-gradient(135deg,#fff9ec 0%,#fdf0d5 100%); border-color:#f0d9a6; box-shadow:0 2px 8px rgba(224,138,30,.1); }
+.lock-banner.is-admin .lb-icon { background:#e08a1e; box-shadow:0 3px 8px rgba(224,138,30,.35); }
+.lock-banner.is-admin .lb-title { color:#8a5200; }
+.lock-banner.is-admin .lb-text { color:#7a5a25; }
+#dutyDayGrid.is-locked .day-cell:not(.empty) { position:relative; background:repeating-linear-gradient(135deg,#f6f7f6,#f6f7f6 8px,#eff1ef 8px,#eff1ef 16px);
+    border-color:#e1e5e2; color:#7b857e; }
+#dutyDayGrid.is-locked .day-cell:not(.empty) .d-amt { color:#6b756e; }
+#dutyDayGrid.is-locked .day-cell:not(.empty)::after { content:"🔒"; position:absolute; top:6px; right:8px; font-size:.7rem; opacity:.55; }
+#dutyDayGrid.is-locked.is-admin-view .day-cell:not(.empty) { background:#fff; border-color:var(--border,#e2e6e3); color:inherit; }
+#dutyDayGrid.is-locked.is-admin-view .day-cell:not(.empty)::after { opacity:.3; }
+fieldset.is-readonly { opacity:.7; filter:grayscale(.25); }
+fieldset.is-readonly input, fieldset.is-readonly label { cursor:not-allowed; }
+</style>
+CSS;
+    }
+    $cls = $isAdmin ? 'lock-banner is-admin' : 'lock-banner';
+    $title = $isAdmin ? h($monthName) . ' is locked for branch accounts' : h($monthName) . ' is locked';
+    $text = $isAdmin
+        ? 'Branch accounts can only view this month. You are an admin, so you can still edit it. Manage locks from the Lock page.'
+        : 'Entries for this month are read-only. If something needs to change, please ask an admin to unlock it.';
+    echo '<div class="' . $cls . '"><div class="lb-icon">🔒</div><div><div class="lb-title">' . $title . '</div><div class="lb-text">' . $text . '</div></div></div>';
+}

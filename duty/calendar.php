@@ -53,9 +53,11 @@ require __DIR__ . '/../includes/header.php';
 <h1>Duty &amp; Service Charge Entry</h1>
 <p class="subtitle">Click a day to record its total service charge and mark which staff were on duty for the selected branch.</p>
 
-<?php foreach (locked_periods_in_range($pdo, $branchId, $firstOfMonth, date('Y-m-t', strtotime($firstOfMonth))) as $lp): ?>
-<div class="alert alert-info">🔒 <?= h($lp['name']) ?> (<?= h(date('M j', strtotime($lp['start_date']))) ?> &ndash; <?= h(date('M j, Y', strtotime($lp['end_date']))) ?>) is locked<?= is_admin() ? ' &mdash; only admins can edit it.' : ' &mdash; days in this range are read-only.' ?></div>
-<?php endforeach; ?>
+<?php
+$lockedList = locked_periods_in_range($pdo, $branchId, $firstOfMonth, date('Y-m-t', strtotime($firstOfMonth)));
+$monthLocked = !empty($lockedList);
+if ($monthLocked) render_lock_banner(date('F Y', strtotime($firstOfMonth)), is_admin());
+?>
 
 <div class="card">
     <?php if (is_branch_locked()): ?>
@@ -79,7 +81,7 @@ require __DIR__ . '/../includes/header.php';
         <a class="btn btn-sm btn-secondary" href="?branch_id=<?= $branchId ?>&month=<?= $nextMonth ?>&year=<?= $nextYear ?>">Next &rarr;</a>
     </div>
 
-    <div class="day-grid" id="dutyDayGrid" style="margin-top:18px;">
+    <div class="day-grid<?= $monthLocked ? ' is-locked' . (is_admin() ? ' is-admin-view' : '') : '' ?>" id="dutyDayGrid" style="margin-top:18px;">
         <?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $wd): ?>
             <div class="small muted" style="text-align:center;font-weight:700;"><?= $wd ?></div>
         <?php endforeach; ?>
@@ -99,7 +101,7 @@ require __DIR__ . '/../includes/header.php';
                     <span class="d-amt"><?= money($rec['regular_amount']) ?></span>
                     <?php if (is_admin()): ?><span class="small muted"><?= (int)$rec['regular_staff_count'] ?> staff</span><?php endif; ?>
                 <?php else: ?>
-                    <span class="small muted">—</span>
+                    <span class="small muted"><?= $monthLocked && !is_admin() ? 'Locked' : '—' ?></span>
                 <?php endif; ?>
             </a>
         <?php endfor; ?>

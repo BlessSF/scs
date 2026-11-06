@@ -141,15 +141,11 @@ require __DIR__ . '/../includes/header.php';
 <p class="subtitle"><?= h($branch['name']) ?> &middot; Enter the total service charge collected for this day, then check off every staff member who was on duty. The amount is split evenly among everyone checked.</p>
 
 <?php foreach ($errors as $e): ?><div class="alert alert-error"><?= h($e) ?></div><?php endforeach; ?>
-<?php if ($lockedPeriod && $readOnly): ?>
-<div class="alert alert-error">🔒 <?= h($lockedPeriod['name']) ?> is locked &mdash; this entry is read-only. Only an admin can unlock it.</div>
-<?php elseif ($lockedPeriod): ?>
-<div class="alert alert-info">🔒 <?= h($lockedPeriod['name']) ?> is locked for other users. You can still edit because you are an admin.</div>
-<?php endif; ?>
+<?php if ($lockedPeriod) render_lock_banner($lockedPeriod['name'], is_admin()); ?>
 
 <form method="post" action="">
     <?= csrf_field() ?>
-    <fieldset <?= $readOnly ? 'disabled' : '' ?> style="border:0;padding:0;margin:0;min-width:0;">
+    <fieldset <?= $readOnly ? 'disabled class="is-readonly"' : '' ?> style="border:0;padding:0;margin:0;min-width:0;">
     <input type="hidden" name="branch_id" value="<?= $branchId ?>">
 
     <div>
@@ -210,7 +206,7 @@ require __DIR__ . '/../includes/header.php';
 
     <div class="sticky-save-bar">
         <div class="actions">
-            <?php if (!$readOnly): ?><button type="submit" class="btn">Save Day</button><?php endif; ?>
+            <?php if (!$readOnly): ?><button type="submit" class="btn">Save Day</button><?php else: ?><span class="muted">🔒 Read-only &mdash; this month is locked.</span><?php endif; ?>
             <a class="btn btn-secondary" href="<?= BASE_URL ?>/duty/calendar.php?branch_id=<?= $branchId ?>&month=<?= date('n', strtotime($date)) ?>&year=<?= date('Y', strtotime($date)) ?>">Back to Calendar</a>
         </div>
     </div>
