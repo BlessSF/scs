@@ -101,22 +101,23 @@ require __DIR__ . '/../includes/header.php';
                 </td>
                 <td><?= $b['is_active'] ? '<span class="badge badge-regular">Active</span>' : '<span class="badge badge-resigned">Inactive</span>' ?></td>
                 <td>
-                    <div class="row-actions">
-                        <a class="btn btn-sm btn-secondary" href="<?= BASE_URL ?>/branches/form.php?id=<?= $b['id'] ?>">Edit</a>
+                    <div class="row-actions" style="display:flex;gap:6px;flex-wrap:nowrap;align-items:center;">
+                        <a class="icon-btn ib-edit" title="Edit" aria-label="Edit <?= h($b['name']) ?>" href="<?= BASE_URL ?>/branches/form.php?id=<?= $b['id'] ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg></a>
                         <?php if (!$isSub): ?>
-                            <a class="btn btn-sm btn-secondary" href="<?= BASE_URL ?>/branches/form.php?parent_id=<?= $b['id'] ?>">+ Sub-Branch</a>
+                            <a class="icon-btn ib-sub" title="Add sub-branch" aria-label="Add sub-branch under <?= h($b['name']) ?>" href="<?= BASE_URL ?>/branches/form.php?parent_id=<?= $b['id'] ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><path d="M6 7.5v9"/><path d="M6 12h6a4 4 0 0 1 4 4"/><path d="M18 3v6M15 6h6"/></svg></a>
                         <?php endif; ?>
                         <?php if (!$isSub || $b['account_username']): ?>
                         <form method="post" action="<?= BASE_URL ?>/branches/reset_password.php" style="display:inline;" onsubmit="return confirm(<?= $b['account_username'] ? h(json_encode('Reset the password for ' . $b['name'] . '\'s account? Its current password will stop working immediately.')) : h(json_encode('Create a login account for ' . $b['name'] . '?')) ?>);">
                             <?= csrf_field() ?>
                             <input type="hidden" name="branch_id" value="<?= $b['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-secondary"><?= $b['account_username'] ? 'Reset Password' : 'Create Account' ?></button>
+                            <?php $__lbl = $b['account_username'] ? 'Reset password' : 'Create login account'; ?>
+                            <button type="submit" class="icon-btn <?= $b['account_username'] ? 'ib-key' : 'ib-new' ?>" title="<?= h($__lbl) ?>" aria-label="<?= h($__lbl) ?> for <?= h($b['name']) ?>"><?= $b['account_username'] ? '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="4.5"/><path d="M10.7 12.3L21 2M16 7l3 3M14 9l2 2"/></svg>' : '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><path d="M19 8v6M16 11h6"/></svg>' ?></button>
                         </form>
                         <?php endif; ?>
                         <form method="post" action="<?= BASE_URL ?>/branches/delete.php" style="display:inline;" onsubmit="return confirm('Delete ' + <?= h(json_encode($b['name'])) ?> + '? This also removes its login account and cannot be undone.');">
                             <?= csrf_field() ?>
                             <input type="hidden" name="id" value="<?= $b['id'] ?>">
-                            <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                            <button type="submit" class="icon-btn ib-del" title="Delete" aria-label="Delete <?= h($b['name']) ?>"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg></button>
                         </form>
                     </div>
                 </td>
@@ -128,4 +129,16 @@ require __DIR__ . '/../includes/header.php';
         </tbody>
     </table>
 </div>
+<style>
+.icon-btn { width:34px; height:34px; padding:0; display:inline-flex; align-items:center; justify-content:center; border-radius:10px;
+    border:1px solid var(--border-strong); background:#fff; color:var(--text-muted); cursor:pointer; text-decoration:none;
+    transition:background .12s, color .12s, border-color .12s, transform .1s; }
+.icon-btn:hover { transform:translateY(-1px); }
+.icon-btn.ib-edit:hover { background:var(--primary); border-color:var(--primary); color:#fff; }
+.icon-btn.ib-sub:hover  { background:#2f7fb8; border-color:#2f7fb8; color:#fff; }
+.icon-btn.ib-key:hover, .icon-btn.ib-new:hover { background:#e08a1e; border-color:#e08a1e; color:#fff; }
+.icon-btn.ib-del:hover  { background:var(--danger); border-color:var(--danger); color:#fff; }
+.icon-btn:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.row-actions form { margin:0 !important; display:inline-flex !important; }
+</style>
 <?php require __DIR__ . '/../includes/footer.php'; ?>
