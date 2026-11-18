@@ -103,6 +103,32 @@ require __DIR__ . '/includes/header.php';
     </form>
 </div>
 
+<?php
+$bk = ['tables' => 0, 'rows' => 0, 'kb' => 0];
+try {
+    $st = $pdo->query("SELECT COUNT(*) AS t, COALESCE(SUM(table_rows),0) AS r, COALESCE(SUM(data_length+index_length),0) AS b
+                       FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'")->fetch();
+    $bk = ['tables' => (int)$st['t'], 'rows' => (int)$st['r'], 'kb' => round($st['b'] / 1024)];
+} catch (Throwable $e) { /* stats are optional */ }
+$lastBackup = get_setting('last_backup_at');
+?>
+<div class="card">
+    <h2>Database Backup</h2>
+    <p class="subtitle small">Downloads the whole database (every table, all data) as one <code>.sql</code> file you can keep as a backup.</p>
+    <p class="small">
+        <?= $bk['tables'] ? '<strong>' . $bk['tables'] . '</strong> tables &middot; about <strong>' . number_format($bk['rows']) . '</strong> records &middot; ' . number_format($bk['kb']) . ' KB &middot; ' : '' ?>
+        Last backup: <strong><?= $lastBackup ? h(date('M j, Y g:i A', strtotime($lastBackup))) : 'never' ?></strong>
+    </p>
+    <form method="post" action="<?= BASE_URL ?>/backup.php">
+        <?= csrf_field() ?>
+        <button type="submit" class="btn">&#11015; Download Full Backup (.sql)</button>
+    </form>
+    <p class="small muted" style="margin-top:12px;">
+        To restore: open phpMyAdmin, select the database, then <em>Import</em> and choose the file. Importing replaces the current tables with the backup.
+        The file contains login password hashes, so store it somewhere private.
+    </p>
+</div>
+
 <div class="card">
     <h2>Owner Accounts</h2>
     <p class="subtitle small">Owners sign in separately from admins and can only see the Dashboard and Owner Earnings.</p>
