@@ -123,6 +123,26 @@ foreach ($earnings as $sid => &$e) {
 }
 unset($e);
 
+// Colours per branch so the same branch looks the same everywhere on the page.
+function oe_color($name) {
+    static $map = []; static $palette = ['#e08a1e', '#1fa24d', '#3b5b8f', '#b8436a', '#7a5ab0', '#2a9aa8'];
+    $u = strtoupper($name);
+    if (strpos($u, 'DOIS') !== false) return '#e08a1e';
+    if (strpos($u, 'STELLA') !== false) return '#1fa24d';
+    if (strpos($u, 'HERO') !== false) return '#3b4a6b';
+    if (!isset($map[$u])) $map[$u] = $palette[count($map) % count($palette)];
+    return $map[$u];
+}
+$netByBranch = []; $netByOwner = [];
+foreach ($earnings as $sid => $e) {
+    if ($staffFilter && $staffFilter !== (int)$sid) continue;
+    $netByOwner[$e['staff']['full_name']] = $e['totals']['net'];
+    foreach ($e['rows'] as $r) $netByBranch[$r['branch_name']] = ($netByBranch[$r['branch_name']] ?? 0) + (float)$r['net'];
+}
+arsort($netByBranch); arsort($netByOwner);
+$posBranchTotal = array_sum(array_map(fn($v) => max(0, $v), $netByBranch));
+$maxOwner = $netByOwner ? max(max($netByOwner), 0.01) : 0.01;
+
 $scopeLabel = ($rangeSel !== '' ? oe_range_label($ranges[$rangeSel]) : 'All periods combined')
             . ($branchSel ? ' · ' . ($branchesInUse[$branchSel] ?? '') : '');
 
@@ -186,7 +206,37 @@ table.oe tfoot td { background:#eef4f2; font-weight:700; border-top:2px solid va
 .oe-act svg { width:14px; height:14px; }
 .oe-empty { padding:22px 18px; color:var(--text-muted); font-size:14px; }
 
+/* overview */
+.oe-ov { display:grid; grid-template-columns:minmax(220px,300px) 1fr; gap:0; background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:16px; overflow:hidden; }
+.oe-ov-l { padding:18px 22px; border-right:1px solid var(--border); background:linear-gradient(180deg,#f3f8f6,#fff); }
+.oe-ov-l .k { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); }
+.oe-ov-l .v { font-size:32px; font-weight:800; color:var(--primary-dark); font-variant-numeric:tabular-nums; margin:4px 0 2px; letter-spacing:-.01em; }
+.oe-ov-l .s { font-size:13px; color:var(--text-muted); }
+.oe-ov-r { padding:16px 22px; display:grid; gap:14px; align-content:center; }
+.oe-sub { font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted); margin-bottom:7px; }
+.oe-split { display:flex; height:14px; border-radius:999px; overflow:hidden; background:var(--bg-alt); gap:2px; }
+.oe-split i { display:block; height:100%; min-width:4px; }
+.oe-leg { display:flex; flex-wrap:wrap; gap:6px 18px; margin-top:8px; font-size:13px; color:var(--text-muted); }
+.oe-leg span { display:inline-flex; align-items:center; gap:6px; }
+.oe-leg b { color:var(--text); font-variant-numeric:tabular-nums; }
+.oe-leg em { width:9px; height:9px; border-radius:3px; display:inline-block; }
+.oe-own { display:grid; gap:7px; }
+.oe-own div { display:grid; grid-template-columns:minmax(120px,210px) 1fr 110px; align-items:center; gap:12px; font-size:13.5px; }
+.oe-own .n { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.oe-own .bar { height:10px; border-radius:999px; background:var(--bg-alt); overflow:hidden; }
+.oe-own .bar i { display:block; height:100%; border-radius:999px; background:var(--primary); }
+.oe-own .a { text-align:right; font-weight:700; font-variant-numeric:tabular-nums; color:var(--primary-dark); }
+/* per-owner branch split */
+.oe-bs { padding:12px 18px 14px; border-bottom:1px solid var(--border); }
+.oe-bs .oe-split { height:10px; }
+.oe-bs .oe-leg { margin-top:7px; font-size:12.5px; }
+.oe-dot { display:inline-block; width:9px; height:9px; border-radius:3px; margin-right:7px; vertical-align:0; }
+
 @media (max-width:760px) {
+  .oe-ov { grid-template-columns:1fr; }
+  .oe-ov-l { border-right:0; border-bottom:1px solid var(--border); }
+  .oe-own div { grid-template-columns:1fr 90px; }
+  .oe-own .bar { grid-column:1 / -1; order:3; }
   .oe-lab { width:100%; }
   .oe-net { text-align:left; }
   .oe-eq > div { padding-right:0; margin-right:14px; }
@@ -238,10 +288,45 @@ table.oe tfoot td { background:#eef4f2; font-weight:700; border-top:2px solid va
     <?php endif; ?>
 </div>
 
-<div class="oe-scope">
+<div class="oe-scope"<?= ($netByBranch && $posBranchTotal > 0) ? ' style="display:none"' : '' ?>>
     <b><?= h($scopeLabel) ?></b>
     <span><?= $shown ?> owner<?= $shown === 1 ? '' : 's' ?> · total net <span class="net"><?= money($grandNet) ?></span></span>
 </div>
+
+<?php if ($netByBranch && $posBranchTotal > 0): ?>
+<div class="oe-ov">
+    <div class="oe-ov-l">
+        <div class="k">Total net earnings</div>
+        <div class="v"><?= money($grandNet) ?></div>
+        <div class="s"><?= h($scopeLabel) ?></div>
+    </div>
+    <div class="oe-ov-r">
+        <div>
+            <div class="oe-sub">Where it came from</div>
+            <div class="oe-split">
+                <?php foreach ($netByBranch as $bn => $v): if ($v <= 0) continue; ?>
+                    <i style="width:<?= round($v / $posBranchTotal * 100, 2) ?>%; background:<?= oe_color($bn) ?>" title="<?= h($bn) ?>"></i>
+                <?php endforeach; ?>
+            </div>
+            <div class="oe-leg">
+                <?php foreach ($netByBranch as $bn => $v): ?>
+                    <span><em style="background:<?= oe_color($bn) ?>"></em><?= h($bn) ?> <b><?= money($v) ?></b> · <?= $posBranchTotal > 0 ? round(max(0,$v) / $posBranchTotal * 100) : 0 ?>%</span>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php if (count($netByOwner) > 1): ?>
+        <div>
+            <div class="oe-sub">By owner</div>
+            <div class="oe-own">
+                <?php foreach ($netByOwner as $on => $v): ?>
+                    <div><span class="n"><?= h($on) ?></span><span class="bar"><i style="width:<?= round(max(0,$v) / $maxOwner * 100, 1) ?>%"></i></span><span class="a"><?= money($v) ?></span></div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+</div>
+<?php endif; ?>
 
 <?php foreach ($hiddenStaff as $s):
     $e = $earnings[$s['id']];
@@ -273,6 +358,22 @@ table.oe tfoot td { background:#eef4f2; font-weight:700; border-top:2px solid va
         <div><div class="k">Net</div><div class="v"><?= money($t['net']) ?></div></div>
     </div>
 
+    <?php
+    $ob = [];
+    foreach ($e['rows'] as $r) $ob[$r['branch_name']] = ($ob[$r['branch_name']] ?? 0) + (float)$r['net'];
+    arsort($ob);
+    $obTot = array_sum(array_map(fn($v) => max(0, $v), $ob));
+    if (count($ob) > 1 && $obTot > 0): ?>
+    <div class="oe-bs">
+        <div class="oe-split">
+            <?php foreach ($ob as $bn => $v): if ($v <= 0) continue; ?><i style="width:<?= round($v / $obTot * 100, 2) ?>%; background:<?= oe_color($bn) ?>" title="<?= h($bn) ?>"></i><?php endforeach; ?>
+        </div>
+        <div class="oe-leg">
+            <?php foreach ($ob as $bn => $v): ?><span><em style="background:<?= oe_color($bn) ?>"></em><?= h($bn) ?> <b><?= money($v) ?></b></span><?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if ($e['rows']): ?>
     <div class="oe-scroll">
         <table class="oe">
@@ -294,7 +395,7 @@ table.oe tfoot td { background:#eef4f2; font-weight:700; border-top:2px solid va
                 $rd = $r['damages_charges'] + $r['cash_advance'] + $r['overcost_cogs']; ?>
                 <tr>
                     <td class="pn"><?= h($r['period_name']) ?></td>
-                    <td><span class="br"><?= h($r['branch_name']) ?></span></td>
+                    <td><span class="oe-dot" style="background:<?= oe_color($r['branch_name']) ?>"></span><?= h($r['branch_name']) ?></td>
                     <td class="dt"><?= h(date('M j', strtotime($r['start_date']))) ?> – <?= h(date('M j, Y', strtotime($r['end_date']))) ?></td>
                     <td class="num"><?= (int)$r['days_worked'] ?></td>
                     <td class="num"><?= money($r['total_sc']) ?></td>
