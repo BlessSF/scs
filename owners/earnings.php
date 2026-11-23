@@ -129,7 +129,7 @@ function oe_color($name) {
     $u = strtoupper($name);
     if (strpos($u, 'DOIS') !== false) return '#e08a1e';
     if (strpos($u, 'STELLA') !== false) return '#1fa24d';
-    if (strpos($u, 'HERO') !== false) return '#3b4a6b';
+    if (strpos($u, 'HERO') !== false) return '#c2201c';
     if (!isset($map[$u])) $map[$u] = $palette[count($map) % count($palette)];
     return $map[$u];
 }
