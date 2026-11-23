@@ -9,9 +9,6 @@ if (!$sharedId) {
     // No "Shared" branch in this database yet -- create it once, automatically.
     $pdo->prepare('INSERT INTO branches (name, is_active) VALUES (?, 1)')->execute(['Shared']);
     $sharedId = (int)$pdo->lastInsertId();
-    if (function_exists('audit_log')) {
-        call_user_func('audit_log', 'create', 'branch', $sharedId, 'Shared', 'Auto-created the "Shared" branch', [], $sharedId);
-    }
 }
 
 $status = trim($_GET['status'] ?? '');
@@ -128,6 +125,7 @@ table.sh tr.off td { opacity:.6; }
 .sh-person { display:flex; align-items:center; gap:12px; min-width:200px; }
 .sh-av { width:38px; height:38px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; background:#e4efeb; color:var(--primary-dark); }
 .sh-nm { font-weight:700; font-size:15px; line-height:1.25; color:var(--text); }
+.sh-hid { display:inline-block; margin-left:8px; padding:1px 8px; border-radius:999px; background:#eef0f5; color:#4a5270; font-size:11px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; vertical-align:2px; }
 .sh-sub { font-size:12.5px; color:var(--text-faint); margin-top:1px; }
 .sh-mh { text-align:center !important; padding-bottom:6px !important; }
 tr.sh-sub-row th { padding-top:6px; padding-bottom:9px; text-align:center; font-size:11px; letter-spacing:.03em; color:var(--text-muted); line-height:1.2; min-width:76px; max-width:110px; white-space:normal; }
@@ -160,7 +158,7 @@ tr.sh-sub-row th { padding-top:6px; padding-bottom:9px; text-align:center; font-
 
 <?php
 $statusTabs = ['' => 'All', 'regular' => 'Regular', 'probationary' => 'Probationary', 'not_regular' => 'Not regular', 'resigned' => 'Resigned'];
-function sh_url($over) { $q = array_merge($_GET, $over); foreach ($q as $k => $v) if ($v === '') unset($q[$k]); return '?' . http_build_query($q); }
+function sh_url(array $over) { $q = array_merge($_GET, $over); foreach ($q as $k => $v) if ($v === '') unset($q[$k]); return '?' . http_build_query($q); }
 ?>
 <?php
 // Branch columns (everything except the Shared pseudo-branch).
@@ -209,15 +207,13 @@ $matrixBranches = array_values(array_filter(get_branches(true), fn($b) => (int)$
             $nameParts = preg_split('/[\s,]+/', trim($s['full_name']), -1, PREG_SPLIT_NO_EMPTY);
             $initials = strtoupper(substr($nameParts[0] ?? '?', 0, 1) . (count($nameParts) > 1 ? substr(end($nameParts), 0, 1) : substr($nameParts[0] ?? '', 1, 1)));
 
-            // Where is this person actually shared? Active hidden owners are added to
-            // EVERY branch's duty days automatically; anyone else only counts where assigned.
-            $autoAll = !empty($s['is_hidden']) && !empty($s['is_active']);
+            // Which branches is this person shared to? Exactly the ones set on their staff record.
             $assignedIds = array_map('intval', get_staff_branch_ids($s['id']));
             $assignedIds[] = (int)$s['branch_id'];
             $sharedCount = 0;
             $cells = [];
             foreach ($matrixBranches as $mb) {
-                $on = $autoAll || in_array((int)$mb['id'], $assignedIds, true);
+                $on = in_array((int)$mb['id'], $assignedIds, true);
                 $cells[] = $on; if ($on) $sharedCount++;
             }
             $stLabel = ucfirst(str_replace('_', ' ', $s['status']));
@@ -227,11 +223,10 @@ $matrixBranches = array_values(array_filter(get_branches(true), fn($b) => (int)$
                     <div class="sh-person">
                         <span class="sh-av"><?= h($initials) ?></span>
                         <div>
-                            <div class="sh-nm"><?= h($s['full_name']) ?></div>
+                            <div class="sh-nm"><?= h($s['full_name']) ?><?php if (!empty($s['is_hidden'])): ?><span class="sh-hid" title="Hidden from branch day-to-day views">Hidden</span><?php endif; ?></div>
                             <div class="sh-sub"><?php
-                                if (!$s['is_active']) echo 'Inactive';
-                                elseif ($autoAll) echo 'All branches';
-                                else echo $sharedCount . ' of ' . count($matrixBranches) . ' branches';
+                                if (!$s['is_active']) echo 'Inactive · ';
+                                echo $sharedCount === count($matrixBranches) ? 'All branches' : ($sharedCount === 0 ? 'No branch' : $sharedCount . ' of ' . count($matrixBranches) . ' branches');
                                 if (!empty($s['remarks'])) echo ' · ' . h($s['remarks']);
                             ?></div>
                         </div>
