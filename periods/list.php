@@ -5,6 +5,8 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $branches = visible_branches(false);
+$__sharedId = function_exists('shared_branch_id') ? (int)shared_branch_id() : 0;
+if ($__sharedId) $branches = array_values(array_filter($branches, fn($b) => (int)$b['id'] !== $__sharedId));
 $branchId = scoped_branch_id($_GET['branch_id'] ?? 0);
 
 $sql = 'SELECT p.*, b.name AS branch_name FROM periods p JOIN branches b ON b.id = p.branch_id';

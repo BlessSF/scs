@@ -5,6 +5,12 @@ require __DIR__ . '/../includes/functions.php';
 require_admin();
 
 $branches = visible_branches(false);
+// Periods are never created for the Shared pseudo-branch -- hide it so it can't be picked by mistake.
+$__sharedId = function_exists('shared_branch_id') ? (int)shared_branch_id() : 0;
+$__editingId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+if ($__sharedId && !$__editingId) {
+    $branches = array_values(array_filter($branches, fn($b) => (int)$b['id'] !== $__sharedId));
+}
 if (!$branches) {
     flash('error', 'Create a branch first before creating a period.');
     redirect('/branches/form.php');
