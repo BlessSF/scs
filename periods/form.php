@@ -103,6 +103,8 @@ require __DIR__ . '/../includes/header.php';
 .pf-branches input:checked + span { border-color:var(--primary); background:#eef6f3; box-shadow:0 0 0 3px rgba(20,108,91,.12); }
 .pf-branches input:focus-visible + span { outline:2px solid var(--primary); outline-offset:2px; }
 
+.pf-dmy { display:grid; grid-template-columns:minmax(0,1.7fr) minmax(0,.9fr) minmax(0,1.1fr); gap:8px; }
+.pf-dmy select { margin:0; height:44px; width:100%; padding:0 10px; font-size:15px; font-weight:600; }
 .pf-presets { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px; }
 .pf-presets button { height:30px; padding:0 12px; border:1px solid var(--border-strong); border-radius:999px; background:#fff; font:600 12.5px/1 inherit; font-family:inherit; color:var(--text); cursor:pointer; margin:0; box-shadow:none; }
 .pf-presets button:hover { background:var(--bg-alt); }
@@ -183,10 +185,20 @@ require __DIR__ . '/../includes/header.php';
                 <button type="button" data-p="last-quarter">Last quarter</button>
             </div>
             <div class="pf-two">
-                <div class="pf-field"><label class="pf-lbl" for="start_date">Start date</label>
-                    <input type="date" id="start_date" name="start_date" value="<?= h($period['start_date']) ?>" required></div>
-                <div class="pf-field"><label class="pf-lbl" for="end_date">End date</label>
-                    <input type="date" id="end_date" name="end_date" value="<?= h($period['end_date']) ?>" required></div>
+                <?php foreach (['start' => 'Start date', 'end' => 'End date'] as $pre => $lab):
+                    $dv = $period[$pre . '_date'] ?: date('Y-m-d');
+                    $cm = (int)date('n', strtotime($dv)); $cd = (int)date('j', strtotime($dv)); $cy = (int)date('Y', strtotime($dv));
+                    $monthsFull = [1=>'January','February','March','April','May','June','July','August','September','October','November','December']; ?>
+                <div class="pf-field">
+                    <span class="pf-lbl"><?= $lab ?></span>
+                    <input type="hidden" id="<?= $pre ?>_date" name="<?= $pre ?>_date" value="<?= h($dv) ?>">
+                    <div class="pf-dmy" data-pre="<?= $pre ?>">
+                        <select class="m" aria-label="<?= $lab ?> month"><?php foreach ($monthsFull as $n => $mn): ?><option value="<?= $n ?>"<?= $n === $cm ? ' selected' : '' ?>><?= $mn ?></option><?php endforeach; ?></select>
+                        <select class="d" aria-label="<?= $lab ?> day"><?php for ($d = 1; $d <= 31; $d++): ?><option value="<?= $d ?>"<?= $d === $cd ? ' selected' : '' ?>><?= $d ?></option><?php endfor; ?></select>
+                        <select class="y" aria-label="<?= $lab ?> year"><?php for ($y = min((int)date('Y') - 3, $cy); $y <= max((int)date('Y') + 3, $cy); $y++): ?><option value="<?= $y ?>"<?= $y === $cy ? ' selected' : '' ?>><?= $y ?></option><?php endfor; ?></select>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
             <span class="pf-days" id="pfDays"></span>
             <div class="pf-warn" id="pfWarn"></div>
@@ -243,6 +255,26 @@ require __DIR__ . '/../includes/header.php';
   function fmt(d) { return MON[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear(); }
   function branchId() { var c = f.querySelector('input[name=branch_id]:checked') || f.querySelector('input[name=branch_id]'); return c ? +c.value : 0; }
 
+  function putDMY(pre, d) {
+    var box = document.querySelector('.pf-dmy[data-pre=' + pre + ']');
+    box.querySelector('.m').value = d.getMonth() + 1;
+    box.querySelector('.d').value = d.getDate();
+    var ys = box.querySelector('.y');
+    if (!ys.querySelector('option[value="' + d.getFullYear() + '"]')) { var o = document.createElement('option'); o.value = o.textContent = d.getFullYear(); ys.appendChild(o); }
+    ys.value = d.getFullYear();
+    $(pre + '_date').value = iso(d);
+  }
+  function syncDMY(pre) {
+    var box = document.querySelector('.pf-dmy[data-pre=' + pre + ']');
+    var m = +box.querySelector('.m').value, y = +box.querySelector('.y').value, d = +box.querySelector('.d').value;
+    var last = new Date(y, m, 0).getDate();
+    if (d > last) { d = last; box.querySelector('.d').value = d; }
+    $(pre + '_date').value = y + '-' + pad(m) + '-' + pad(d);
+  }
+  document.querySelectorAll('.pf-dmy select').forEach(function (sel) {
+    sel.addEventListener('change', function () { syncDMY(sel.closest('.pf-dmy').dataset.pre); update(); });
+  });
+
   function suggestName(s, e) {
     if (!s || !e) return '';
     var sameMonth = s.getFullYear() === e.getFullYear() && s.getMonth() === e.getMonth() && s.getDate() === 1 &&
@@ -251,7 +283,7 @@ require __DIR__ . '/../includes/header.php';
     return '';
   }
   function setRange(s, e) {
-    $('start_date').value = iso(s); $('end_date').value = iso(e);
+    putDMY('start', s); putDMY('end', e);
     var n = $('name');
     if (!n.value.trim() || n.dataset.auto === '1') {
       var g = suggestName(s, e);
