@@ -6,9 +6,16 @@ require_admin();
 
 $branches = visible_branches(false);
 // Periods are never created for the Shared pseudo-branch -- hide it so it can't be picked by mistake.
+// (Only kept if this very period already belongs to Shared, so editing it doesn't break.)
 $__sharedId = function_exists('shared_branch_id') ? (int)shared_branch_id() : 0;
-$__editingId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($__sharedId && !$__editingId) {
+$__editId = isset($_GET['id']) ? (int)$_GET['id'] : (isset($_POST['id']) ? (int)$_POST['id'] : 0);
+$__keepShared = false;
+if ($__sharedId && $__editId) {
+    $__q = $pdo->prepare('SELECT branch_id FROM periods WHERE id = ?');
+    $__q->execute([$__editId]);
+    $__keepShared = ((int)$__q->fetchColumn() === $__sharedId);
+}
+if ($__sharedId && !$__keepShared) {
     $branches = array_values(array_filter($branches, fn($b) => (int)$b['id'] !== $__sharedId));
 }
 if (!$branches) {
